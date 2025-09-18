@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>暗記マスター - 学習支援アプリ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <style>
+        /* カスタムスタイル */
+        .term-card {
+            transition: all 0.3s ease;
+        }
+        .term-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(33, 150, 243, 0.15);
+        }
+        .completed .term-name {
+            text-decoration: line-through;
+            color: #6c757d;
+        }
+        .tooltip {
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .term-name:hover + .tooltip,
+        .tooltip:hover {
+            visibility: visible;
+            opacity: 1;
+        }
+        .progress-bar {
+            transition: width 0.8s ease;
+        }
+        .fade-in {
+            animation: fadeIn 0.3s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .search-highlight {
+            background: linear-gradient(120deg, #fff3e0 0%, #ffe0b2 100%);
+            padding: 2px 4px;
+            border-radius: 2px;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen flex flex-col">
+    <!-- ヘッダー -->
+    <header class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <h1 class="text-xl font-bold text-gray-900">📚 暗記マスター</h1>
+                <button id="addTermBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+                    + 用語追加
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- メインコンテンツ -->
+    <main class="flex-grow container mx-auto px-4 py-6 max-w-7xl">
+        <!-- 統計情報 -->
+        <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-6 mb-6">
+            <div class="grid grid-cols-3 gap-4 text-center">
+                <div>
+                    <div class="text-sm text-blue-600 font-medium mb-1">理解済み</div>
+                    <div class="text-2xl font-bold text-blue-900" id="completedCount">0</div>
+                </div>
+                <div>
+                    <div class="text-sm text-blue-600 font-medium mb-1">総用語数</div>
+                    <div class="text-2xl font-bold text-blue-900" id="totalCount">0</div>
+                </div>
+                <div>
+                    <div class="text-sm text-blue-600 font-medium mb-1">理解率</div>
+                    <div class="text-2xl font-bold text-blue-900" id="progressRate">0%</div>
+                </div>
+            </div>
+            <div class="mt-4 bg-gray-200 rounded-full h-3 overflow-hidden">
+                <div id="progressBar" class="progress-bar bg-gradient-to-r from-green-400 to-green-600 h-full rounded-full" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <!-- 検索・フィルター -->
+        <div class="bg-white rounded-lg shadow-sm border p-4 mb-6">
+            <div class="flex flex-col sm:flex-row gap-4">
+                <input 
+                    type="text" 
+                    id="searchInput" 
+                    placeholder="用語名・解説で検索..." 
+                    class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                >
+                <select 
+                    id="categoryFilter" 
+                    class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                    <option value="">全カテゴリ</option>
+                </select>
+                <select 
+                    id="sortOrder" 
+                    class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                    <option value="newest">新着順</option>
+                    <option value="alphabetical">五十音順</option>
+                    <option value="importance">重要度順</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- 用語リスト -->
+        <div id="termsList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-20">
+            <!-- 動的に生成 -->
+        </div>
+
+        <!-- 空の状態表示 -->
+        <div id="emptyState" class="hidden text-center py-12">
+            <div class="text-gray-400 text-6xl mb-4">📝</div>
+            <p class="text-gray-600 text-lg">まだ用語が登録されていません</p>
+            <p class="text-gray-500 mt-2">「用語追加」ボタンから始めましょう</p>
+        </div>
+    </main>
+
+    <!-- フッタータブ -->
+    <footer class="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg">
+        <div class="grid grid-cols-4 divide-x">
+            <button class="tab-button active py-4 hover:bg-gray-50 transition" data-filter="all">
+                <div class="text-xs text-gray-600">すべて</div>
+                <div class="font-medium text-gray-900 mt-1">全表示</div>
+            </button>
+            <button class="tab-button py-4 hover:bg-gray-50 transition" data-filter="incomplete">
+                <div class="text-xs text-gray-600">未理解</div>
+                <div class="font-medium text-gray-900 mt-1">❌</div>
+            </button>
+            <button class="tab-button py-4 hover:bg-gray-50 transition" data-filter="completed">
+                <div class="text-xs text-gray-600">理解済み</div>
+                <div class="font-medium text-gray-900 mt-1">✅</div>
+            </button>
+            <button class="tab-button py-4 hover:bg-gray-50 transition" data-filter="bookmarked">
+                <div class="text-xs text-gray-600">ブックマーク</div>
+                <div class="font-medium text-gray-900 mt-1">⭐</div>
+            </button>
+        </div>
+    </footer>
+
+    <!-- 用語追加モーダル -->
+    <div id="addModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4">
+            <h2 class="text-xl font-bold mb-4">新しい用語を追加</h2>
+            <form id="addTermForm">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">用語</label>
+                    <input 
+                        type="text" 
+                        id="termInput" 
+                        required 
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        placeholder="例: アクセス権"
+                    >
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">解説</label>
+                    <textarea 
+                        id="descriptionInput" 
+                        required 
+                        rows="3"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        placeholder="例: 情報や資源に対する利用許可のこと"
+                    ></textarea>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">カテゴリ</label>
+                    <input 
+                        type="text" 
+                        id="categoryInput" 
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        placeholder="例: IT用語"
+                    >
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">重要度</label>
+                    <select 
+                        id="importanceInput" 
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    >
+                        <option value="1">★ 基本</option>
+                        <option value="2" selected>★★ 重要</option>
+                        <option value="3">★★★ 最重要</option>
+                    </select>
+                </div>
+                <div class="flex gap-3 justify-end">
+                    <button 
+                        type="button" 
+                        id="cancelAddBtn" 
+                        class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition"
+                    >
+                        キャンセル
+                    </button>
+                    <button 
+                        type="submit" 
+                        class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition"
+                    >
+                        追加
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Firebase設定（環境に応じて変更してください）
+        const firebaseConfig = {
+            // ここにFirebaseの設定を入力
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        // 開発用のローカルストレージを使用（Firebaseが設定されていない場合）
+        let useLocalStorage = false;
+        try {
+            firebase.initializeApp(firebaseConfig);
+            var db = firebase.firestore();
+        } catch (error) {
+            console.log('Firebaseが設定されていないため、ローカルストレージを使用します');
+            useLocalStorage = true;
+        }
+
+        // アプリケーションの状態管理
+        let terms = [];
+        let filteredTerms = [];
+        let currentFilter = 'all';
+
+        // 初期化
+        document.addEventListener('DOMContentLoaded', () => {
+            loadTerms();
+            setupEventListeners();
+            loadSampleData(); // 初回のみサンプルデータを読み込み
+        });
+
+        // サンプルデータの読み込み
+        function loadSampleData() {
+            const storageKey = 'memorizeSampleLoaded';
+            if (localStorage.getItem(storageKey)) return;
+
+            const sampleTerms = [
+                { term: 'アクセス権', description: '情報や資源に対する利用許可のこと', category: 'IT用語', importance: 3 },
+                { term: 'IT統括', description: '組織内の情報技術全般を管理・統括すること', category: 'IT用語', importance: 2 },
+                { term: 'ウィキ', description: '共同編集が可能なWebサイトシステム', category: 'Web', importance: 2 },
+                { term: 'ウェブアクセス', description: 'インターネットを通じてWebサイトにアクセスすること', category: 'Web', importance: 1 },
+                { term: '運送営業', description: '貨物や人を運送することを業とする営業', category: '法律', importance: 2 },
+                { term: '営業許可', description: '特定の事業を行うために必要な行政の許可', category: '法律', importance: 3 },
+                { term: '汚染者負担の原則', description: '環境汚染を引き起こした者が対策費用を負担すべきという原則', category: '環境', importance: 3 },
+                { term: 'オプトイン', description: '事前に明示的な同意を得てから情報を送信する方式', category: 'マーケティング', importance: 2 },
+            ];
+
+            sampleTerms.forEach(termData => {
+                termData.id = generateId();
+                termData.completed = false;
+                termData.bookmarked = false;
+                termData.createdAt = new Date().toISOString();
+                saveTerm(termData);
+            });
+
+            localStorage.setItem(storageKey, 'true');
+            loadTerms();
+        }
+
+        // イベントリスナーの設定
+        function setupEventListeners() {
+            // モーダル関連
+            document.getElementById('addTermBtn').addEventListener('click', () => {
+                document.getElementById('addModal').classList.remove('hidden');
+                document.getElementById('addModal').classList.add('flex');
+            });
+
+            document.getElementById('cancelAddBtn').addEventListener('click', () => {
+                document.getElementById('addModal').classList.add('hidden');
+                document.getElementById('addModal').classList.remove('flex');
+                document.getElementById('addTermForm').reset();
+            });
+
+            // 用語追加フォーム
+            document.getElementById('addTermForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const termData = {
+                    id: generateId(),
+                    term: document.getElementById('termInput').value,
+                    description: document.getElementById('descriptionInput').value,
+                    category: document.getElementById('categoryInput').value || '未分類',
+                    importance: parseInt(document.getElementById('importanceInput').value),
+                    completed: false,
+                    bookmarked: false,
+                    createdAt: new Date().toISOString()
+                };
+
+                await saveTerm(termData);
+                document.getElementById('addModal').classList.add('hidden');
+                document.getElementById('addModal').classList.remove('flex');
+                document.getElementById('addTermForm').reset();
+                loadTerms();
+            });
+
+            // 検索
+            document.getElementById('searchInput').addEventListener('input', (e) => {
+                filterAndDisplayTerms();
+            });
+
+            // カテゴリフィルター
+            document.getElementById('categoryFilter').addEventListener('change', () => {
+                filterAndDisplayTerms();
+            });
+
+            // ソート
+            document.getElementById('sortOrder').addEventListener('change', () => {
+                filterAndDisplayTerms();
+            });
+
+            // タブ切り替え
+            document.querySelectorAll('.tab-button').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('bg-blue-50', 'border-t-2', 'border-blue-500'));
+                    button.classList.add('bg-blue-50', 'border-t-2', 'border-blue-500');
+                    currentFilter = button.dataset.filter;
+                    filterAndDisplayTerms();
+                });
+            });
+        }
+
+        // 用語の読み込み
+        async function loadTerms() {
+            if (useLocalStorage) {
+                const stored = localStorage.getItem('memorizeTerms');
+                terms = stored ? JSON.parse(stored) : [];
+            } else {
+                try {
+                    const snapshot = await db.collection('terms').orderBy('createdAt', 'desc').get();
+                    terms = [];
+                    snapshot.forEach(doc => {
+                        terms.push({ id: doc.id, ...doc.data() });
+                    });
+                } catch (error) {
+                    console.error('データの読み込みに失敗しました:', error);
+                    terms = [];
+                }
+            }
+
+            updateCategories();
+            filterAndDisplayTerms();
+        }
+
+        // 用語の保存
+        async function saveTerm(termData) {
+            if (useLocalStorage) {
+                const stored = localStorage.getItem('memorizeTerms');
+                const terms = stored ? JSON.parse(stored) : [];
+                terms.push(termData);
+                localStorage.setItem('memorizeTerms', JSON.stringify(terms));
+            } else {
+                try {
+                    await db.collection('terms').doc(termData.id).set(termData);
+                } catch (error) {
+                    console.error('保存に失敗しました:', error);
+                }
+            }
+        }
+
+        // 用語の更新
+        async function updateTerm(termId, updates) {
+            const index = terms.findIndex(t => t.id === termId);
+            if (index !== -1) {
+                terms[index] = { ...terms[index], ...updates };
+                
+                if (useLocalStorage) {
+                    localStorage.setItem('memorizeTerms', JSON.stringify(terms));
+                } else {
+                    try {
+                        await db.collection('terms').doc(termId).update(updates);
+                    } catch (error) {
+                        console.error('更新に失敗しました:', error);
+                    }
+                }
+                
+                filterAndDisplayTerms();
+            }
+        }
+
+        // 用語の削除
+        async function deleteTerm(termId) {
+            if (confirm('この用語を削除しますか？')) {
+                terms = terms.filter(t => t.id !== termId);
+                
+                if (useLocalStorage) {
+                    localStorage.setItem('memorizeTerms', JSON.stringify(terms));
+                } else {
+                    try {
+                        await db.collection('terms').doc(termId).delete();
+                    } catch (error) {
+                        console.error('削除に失敗しました:', error);
+                    }
+                }
+                
+                filterAndDisplayTerms();
+            }
+        }
+
+        // フィルター処理
+        function filterAndDisplayTerms() {
+            filteredTerms = [...terms];
+
+            // タブフィルター
+            if (currentFilter === 'completed') {
+                filteredTerms = filteredTerms.filter(t => t.completed);
+            } else if (currentFilter === 'incomplete') {
+                filteredTerms = filteredTerms.filter(t => !t.completed);
+            } else if (currentFilter === 'bookmarked') {
+                filteredTerms = filteredTerms.filter(t => t.bookmarked);
+            }
+
+            // 検索フィルター
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            if (searchTerm) {
+                filteredTerms = filteredTerms.filter(t => 
+                    t.term.toLowerCase().includes(searchTerm) ||
+                    t.description.toLowerCase().includes(searchTerm)
+                );
+            }
+
+            // カテゴリフィルター
+            const category = document.getElementById('categoryFilter').value;
+            if (category) {
+                filteredTerms = filteredTerms.filter(t => t.category === category);
+            }
+
+            // ソート
+            const sortOrder = document.getElementById('sortOrder').value;
+            if (sortOrder === 'alphabetical') {
+                filteredTerms.sort((a, b) => a.term.localeCompare(b.term, 'ja'));
+            } else if (sortOrder === 'importance') {
+                filteredTerms.sort((a, b) => b.importance - a.importance);
+            } else {
+                filteredTerms.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+            }
+
+            displayTerms();
+            updateStats();
+        }
+
+        // 用語の表示
+        function displayTerms() {
+            const container = document.getElementById('termsList');
+            const emptyState = document.getElementById('emptyState');
+            
+            if (filteredTerms.length === 0) {
+                container.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                return;
+            }
+            
+            emptyState.classList.add('hidden');
+            container.innerHTML = filteredTerms.map(term => `
+                <div class="term-card bg-white rounded-lg border p-4 ${term.completed ? 'completed bg-gray-50' : ''} fade-in">
+                    <div class="flex justify-between items-start mb-3">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2">
+                                <input 
+                                    type="checkbox" 
+                                    ${term.completed ? 'checked' : ''}
+                                    onchange="updateTerm('${term.id}', { completed: this.checked })"
+                                    class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                                >
+                                <h3 class="term-name font-semibold text-gray-900 cursor-help relative">
+                                    ${escapeHtml(term.term)}
+                                </h3>
+                                <div class="tooltip absolute left-0 top-full mt-2 bg-gray-900 text-white p-3 rounded-lg shadow-lg z-10 w-64 pointer-events-none">
+                                    <div class="text-sm">${escapeHtml(term.description)}</div>
+                                    <div class="absolute -top-2 left-4 w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-gray-900"></div>
+                                </div>
+                            </div>
+                            <span class="text-xs text-gray-500">${term.category}</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-yellow-500">${'★'.repeat(term.importance)}</span>
+                            <button 
+                                onclick="updateTerm('${term.id}', { bookmarked: !${term.bookmarked} })"
+                                class="${term.bookmarked ? 'text-yellow-500' : 'text-gray-300'} hover:text-yellow-500 transition"
+                            >
+                                ${term.bookmarked ? '⭐' : '☆'}
+                            </button>
+                            <button 
+                                onclick="deleteTerm('${term.id}')"
+                                class="text-red-500 hover:text-red-700 transition text-sm"
+                            >
+                                ×
+                            </button>
+                        </div>
+                    </div>
+                    <p class="text-sm text-gray-600">${escapeHtml(term.description)}</p>
+                </div>
+            `).join('');
+        }
+
+        // 統計情報の更新
+        function updateStats() {
+            const total = terms.length;
+            const completed = terms.filter(t => t.completed).length;
+            const rate = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+            document.getElementById('completedCount').textContent = completed;
+            document.getElementById('totalCount').textContent = total;
+            document.getElementById('progressRate').textContent = rate + '%';
+            document.getElementById('progressBar').style.width = rate + '%';
+        }
+
+        // カテゴリ選択肢の更新
+        function updateCategories() {
+            const categories = [...new Set(terms.map(t => t.category))].filter(c => c);
+            const select = document.getElementById('categoryFilter');
+            select.innerHTML = '<option value="">全カテゴリ</option>' +
+                categories.map(c => `<option value="${c}">${c}</option>`).join('');
+        }
+
+        // ユーティリティ関数
+        function generateId() {
+            return Date.now().toString(36) + Math.random().toString(36).substr(2);
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
