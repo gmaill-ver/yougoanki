@@ -21,13 +21,18 @@
             text-decoration: line-through;
             color: #6c757d;
         }
+        .term-tag.completed span {
+            text-decoration: line-through;
+            color: #6c757d;
+        }
         .tooltip {
             visibility: hidden;
             opacity: 0;
             transition: opacity 0.3s;
+            pointer-events: none;
         }
         .term-name:hover + .tooltip,
-        .tooltip:hover {
+        .term-tag:hover .tooltip {
             visibility: visible;
             opacity: 1;
         }
@@ -46,6 +51,47 @@
             padding: 2px 4px;
             border-radius: 2px;
         }
+        .term-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 20px;
+            font-size: 14px;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            position: relative;
+        }
+        .term-tag:hover {
+            border-color: #3b82f6;
+            background: #f0f9ff;
+        }
+        .term-tag.completed {
+            background: #f3f4f6;
+            border-color: #d1d5db;
+        }
+        .term-tag .checkbox {
+            width: 16px;
+            height: 16px;
+        }
+        .view-toggle {
+            display: inline-flex;
+            background: #f3f4f6;
+            border-radius: 8px;
+            padding: 2px;
+        }
+        .view-toggle button {
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        .view-toggle button.active {
+            background: white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen flex flex-col">
@@ -54,9 +100,15 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-16">
                 <h1 class="text-xl font-bold text-gray-900">📚 暗記マスター</h1>
-                <button id="addTermBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
-                    + 用語追加
-                </button>
+                <div class="flex items-center gap-4">
+                    <div class="view-toggle">
+                        <button id="tagViewBtn" class="active">タグ表示</button>
+                        <button id="cardViewBtn">カード表示</button>
+                    </div>
+                    <button id="addTermBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+                        + 用語追加
+                    </button>
+                </div>
             </div>
         </div>
     </header>
@@ -93,25 +145,17 @@
                     placeholder="用語名・解説で検索..." 
                     class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
                 >
-                <select 
-                    id="categoryFilter" 
-                    class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                    <option value="">全カテゴリ</option>
-                </select>
-                <select 
-                    id="sortOrder" 
-                    class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                    <option value="newest">新着順</option>
-                    <option value="alphabetical">五十音順</option>
-                    <option value="importance">重要度順</option>
-                </select>
+                <div class="flex gap-2">
+                    <button id="filterAllBtn" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm">すべて</button>
+                    <button id="filterCompletedBtn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm">理解済み</button>
+                    <button id="filterIncompleteBtn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm">未理解</button>
+                    <button id="filterImportantBtn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm">重要度★★★</button>
+                </div>
             </div>
         </div>
 
         <!-- 用語リスト -->
-        <div id="termsList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-20">
+        <div id="termsList" class="mb-20">
             <!-- 動的に生成 -->
         </div>
 
@@ -145,11 +189,12 @@
         </div>
     </footer>
 
-    <!-- 用語追加モーダル -->
-    <div id="addModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
-        <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4">
-            <h2 class="text-xl font-bold mb-4">新しい用語を追加</h2>
-            <form id="addTermForm">
+    <!-- 用語追加/編集モーダル -->
+    <div id="termModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <h2 id="modalTitle" class="text-xl font-bold mb-4">新しい用語を追加</h2>
+            <form id="termForm">
+                <input type="hidden" id="editTermId">
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-gray-700 mb-1">用語</label>
                     <input 
@@ -158,6 +203,15 @@
                         required 
                         class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                         placeholder="例: アクセス権"
+                    >
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">読み（ひらがな）</label>
+                    <input 
+                        type="text" 
+                        id="readingInput" 
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        placeholder="例: あくせすけん"
                     >
                 </div>
                 <div class="mb-4">
@@ -193,13 +247,14 @@
                 <div class="flex gap-3 justify-end">
                     <button 
                         type="button" 
-                        id="cancelAddBtn" 
+                        id="cancelModalBtn" 
                         class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition"
                     >
                         キャンセル
                     </button>
                     <button 
                         type="submit" 
+                        id="submitBtn"
                         class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition"
                     >
                         追加
@@ -235,12 +290,14 @@
         let terms = [];
         let filteredTerms = [];
         let currentFilter = 'all';
+        let viewMode = 'tag'; // 'tag' or 'card'
+        let editingTermId = null;
 
         // 初期化
         document.addEventListener('DOMContentLoaded', () => {
             loadTerms();
             setupEventListeners();
-            loadSampleData(); // 初回のみサンプルデータを読み込み
+            loadSampleData();
         });
 
         // サンプルデータの読み込み
@@ -249,14 +306,24 @@
             if (localStorage.getItem(storageKey)) return;
 
             const sampleTerms = [
-                { term: 'アクセス権', description: '情報や資源に対する利用許可のこと', category: 'IT用語', importance: 3 },
-                { term: 'IT統括', description: '組織内の情報技術全般を管理・統括すること', category: 'IT用語', importance: 2 },
-                { term: 'ウィキ', description: '共同編集が可能なWebサイトシステム', category: 'Web', importance: 2 },
-                { term: 'ウェブアクセス', description: 'インターネットを通じてWebサイトにアクセスすること', category: 'Web', importance: 1 },
-                { term: '運送営業', description: '貨物や人を運送することを業とする営業', category: '法律', importance: 2 },
-                { term: '営業許可', description: '特定の事業を行うために必要な行政の許可', category: '法律', importance: 3 },
-                { term: '汚染者負担の原則', description: '環境汚染を引き起こした者が対策費用を負担すべきという原則', category: '環境', importance: 3 },
-                { term: 'オプトイン', description: '事前に明示的な同意を得てから情報を送信する方式', category: 'マーケティング', importance: 2 },
+                { term: 'IT統括', reading: 'あいてぃとうかつ', description: '組織内の情報技術全般を管理・統括すること', category: 'IT用語', importance: 2 },
+                { term: '仔用薬', reading: 'しようやく', description: '動物の子供専用の医薬品', category: '医療', importance: 2 },
+                { term: 'アクセス権', reading: 'あくせすけん', description: '情報や資源に対する利用許可のこと', category: 'IT用語', importance: 3 },
+                { term: 'あっせん', reading: 'あっせん', description: '当事者間の紛争解決を助けること', category: '法律', importance: 2 },
+                { term: '一般社団法人日本クレジット協会', reading: 'いっぱんしゃだんほうじんにほんくれじっときょうかい', description: 'クレジット業界の健全な発展を目的とした団体', category: '組織', importance: 2 },
+                { term: '一般法', reading: 'いっぱんほう', description: '特別法に対して一般的に適用される法律', category: '法律', importance: 3 },
+                { term: '委任命令', reading: 'いにんめいれい', description: '法律の委任に基づいて制定される命令', category: '法律', importance: 2 },
+                { term: '違法性の意識', reading: 'いほうせいのいしき', description: '自己の行為が法に反することの認識', category: '法律', importance: 3 },
+                { term: 'ウィキ', reading: 'うぃき', description: '共同編集が可能なWebサイトシステム', category: 'Web', importance: 2 },
+                { term: '準送営業', reading: 'じゅんそうえいぎょう', description: '準送による営業活動', category: 'ビジネス', importance: 1 },
+                { term: '営業譲渡', reading: 'えいぎょうじょうと', description: '事業の全部または一部を他者に譲り渡すこと', category: 'ビジネス', importance: 3 },
+                { term: '営業の自由', reading: 'えいぎょうのじゆう', description: '職業選択の自由の一環として保障される権利', category: '法律', importance: 3 },
+                { term: '営業の商行為', reading: 'えいぎょうのしょうこうい', description: '営業として行う商業上の行為', category: '商法', importance: 2 },
+                { term: '汚染者負担の原則', reading: 'おせんしゃふたんのげんそく', description: '環境汚染を引き起こした者が対策費用を負担すべきという原則', category: '環境', importance: 3 },
+                { term: 'オプトイン', reading: 'おぷといん', description: '事前に明示的な同意を得てから情報を送信する方式', category: 'マーケティング', importance: 2 },
+                { term: 'オープンソース', reading: 'おーぷんそーす', description: 'ソースコードが公開されている', category: 'IT用語', importance: 1 },
+                { term: 'オープンデータ', reading: 'おーぷんでーた', description: '自由に利用可能な公開データ', category: 'IT用語', importance: 1 },
+                { term: 'オンライン・データベース', reading: 'おんらいんでーたべーす', description: 'インターネット経由で利用できるデータベース', category: 'IT用語', importance: 1 }
             ];
 
             sampleTerms.forEach(termData => {
@@ -273,36 +340,53 @@
 
         // イベントリスナーの設定
         function setupEventListeners() {
+            // 表示切り替え
+            document.getElementById('tagViewBtn').addEventListener('click', () => {
+                viewMode = 'tag';
+                document.getElementById('tagViewBtn').classList.add('active');
+                document.getElementById('cardViewBtn').classList.remove('active');
+                displayTerms();
+            });
+
+            document.getElementById('cardViewBtn').addEventListener('click', () => {
+                viewMode = 'card';
+                document.getElementById('cardViewBtn').classList.add('active');
+                document.getElementById('tagViewBtn').classList.remove('active');
+                displayTerms();
+            });
+
             // モーダル関連
             document.getElementById('addTermBtn').addEventListener('click', () => {
-                document.getElementById('addModal').classList.remove('hidden');
-                document.getElementById('addModal').classList.add('flex');
+                openModal();
             });
 
-            document.getElementById('cancelAddBtn').addEventListener('click', () => {
-                document.getElementById('addModal').classList.add('hidden');
-                document.getElementById('addModal').classList.remove('flex');
-                document.getElementById('addTermForm').reset();
+            document.getElementById('cancelModalBtn').addEventListener('click', () => {
+                closeModal();
             });
 
-            // 用語追加フォーム
-            document.getElementById('addTermForm').addEventListener('submit', async (e) => {
+            // 用語追加/編集フォーム
+            document.getElementById('termForm').addEventListener('submit', async (e) => {
                 e.preventDefault();
+                
                 const termData = {
-                    id: generateId(),
                     term: document.getElementById('termInput').value,
+                    reading: document.getElementById('readingInput').value,
                     description: document.getElementById('descriptionInput').value,
                     category: document.getElementById('categoryInput').value || '未分類',
                     importance: parseInt(document.getElementById('importanceInput').value),
-                    completed: false,
-                    bookmarked: false,
-                    createdAt: new Date().toISOString()
                 };
 
-                await saveTerm(termData);
-                document.getElementById('addModal').classList.add('hidden');
-                document.getElementById('addModal').classList.remove('flex');
-                document.getElementById('addTermForm').reset();
+                if (editingTermId) {
+                    await updateTerm(editingTermId, termData);
+                } else {
+                    termData.id = generateId();
+                    termData.completed = false;
+                    termData.bookmarked = false;
+                    termData.createdAt = new Date().toISOString();
+                    await saveTerm(termData);
+                }
+
+                closeModal();
                 loadTerms();
             });
 
@@ -311,14 +395,18 @@
                 filterAndDisplayTerms();
             });
 
-            // カテゴリフィルター
-            document.getElementById('categoryFilter').addEventListener('change', () => {
-                filterAndDisplayTerms();
+            // フィルターボタン
+            document.getElementById('filterAllBtn').addEventListener('click', () => {
+                setActiveFilter('all');
             });
-
-            // ソート
-            document.getElementById('sortOrder').addEventListener('change', () => {
-                filterAndDisplayTerms();
+            document.getElementById('filterCompletedBtn').addEventListener('click', () => {
+                setActiveFilter('completed');
+            });
+            document.getElementById('filterIncompleteBtn').addEventListener('click', () => {
+                setActiveFilter('incomplete');
+            });
+            document.getElementById('filterImportantBtn').addEventListener('click', () => {
+                setActiveFilter('important');
             });
 
             // タブ切り替え
@@ -330,6 +418,66 @@
                     filterAndDisplayTerms();
                 });
             });
+        }
+
+        // フィルター設定
+        function setActiveFilter(filter) {
+            currentFilter = filter;
+            const buttons = {
+                'all': document.getElementById('filterAllBtn'),
+                'completed': document.getElementById('filterCompletedBtn'),
+                'incomplete': document.getElementById('filterIncompleteBtn'),
+                'important': document.getElementById('filterImportantBtn')
+            };
+
+            Object.values(buttons).forEach(btn => {
+                btn.classList.remove('bg-blue-600', 'text-white');
+                btn.classList.add('bg-gray-200', 'text-gray-700');
+            });
+
+            if (buttons[filter]) {
+                buttons[filter].classList.remove('bg-gray-200', 'text-gray-700');
+                buttons[filter].classList.add('bg-blue-600', 'text-white');
+            }
+
+            filterAndDisplayTerms();
+        }
+
+        // モーダル操作
+        function openModal(termId = null) {
+            const modal = document.getElementById('termModal');
+            const form = document.getElementById('termForm');
+            
+            if (termId) {
+                const term = terms.find(t => t.id === termId);
+                if (term) {
+                    editingTermId = termId;
+                    document.getElementById('modalTitle').textContent = '用語を編集';
+                    document.getElementById('submitBtn').textContent = '更新';
+                    document.getElementById('editTermId').value = termId;
+                    document.getElementById('termInput').value = term.term;
+                    document.getElementById('readingInput').value = term.reading || '';
+                    document.getElementById('descriptionInput').value = term.description;
+                    document.getElementById('categoryInput').value = term.category;
+                    document.getElementById('importanceInput').value = term.importance;
+                }
+            } else {
+                editingTermId = null;
+                document.getElementById('modalTitle').textContent = '新しい用語を追加';
+                document.getElementById('submitBtn').textContent = '追加';
+                form.reset();
+            }
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('termModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            document.getElementById('termForm').reset();
+            editingTermId = null;
         }
 
         // 用語の読み込み
@@ -350,7 +498,6 @@
                 }
             }
 
-            updateCategories();
             filterAndDisplayTerms();
         }
 
@@ -413,13 +560,15 @@
         function filterAndDisplayTerms() {
             filteredTerms = [...terms];
 
-            // タブフィルター
+            // フィルター適用
             if (currentFilter === 'completed') {
                 filteredTerms = filteredTerms.filter(t => t.completed);
             } else if (currentFilter === 'incomplete') {
                 filteredTerms = filteredTerms.filter(t => !t.completed);
             } else if (currentFilter === 'bookmarked') {
                 filteredTerms = filteredTerms.filter(t => t.bookmarked);
+            } else if (currentFilter === 'important') {
+                filteredTerms = filteredTerms.filter(t => t.importance === 3);
             }
 
             // 検索フィルター
@@ -431,21 +580,12 @@
                 );
             }
 
-            // カテゴリフィルター
-            const category = document.getElementById('categoryFilter').value;
-            if (category) {
-                filteredTerms = filteredTerms.filter(t => t.category === category);
-            }
-
-            // ソート
-            const sortOrder = document.getElementById('sortOrder').value;
-            if (sortOrder === 'alphabetical') {
-                filteredTerms.sort((a, b) => a.term.localeCompare(b.term, 'ja'));
-            } else if (sortOrder === 'importance') {
-                filteredTerms.sort((a, b) => b.importance - a.importance);
-            } else {
-                filteredTerms.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-            }
+            // ソート（読みがなで五十音順）
+            filteredTerms.sort((a, b) => {
+                const aReading = a.reading || a.term;
+                const bReading = b.reading || b.term;
+                return aReading.localeCompare(bReading, 'ja');
+            });
 
             displayTerms();
             updateStats();
@@ -463,46 +603,77 @@
             }
             
             emptyState.classList.add('hidden');
-            container.innerHTML = filteredTerms.map(term => `
-                <div class="term-card bg-white rounded-lg border p-4 ${term.completed ? 'completed bg-gray-50' : ''} fade-in">
-                    <div class="flex justify-between items-start mb-3">
-                        <div class="flex-1">
-                            <div class="flex items-center gap-2">
-                                <input 
-                                    type="checkbox" 
-                                    ${term.completed ? 'checked' : ''}
-                                    onchange="updateTerm('${term.id}', { completed: this.checked })"
-                                    class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                                >
-                                <h3 class="term-name font-semibold text-gray-900 cursor-help relative">
-                                    ${escapeHtml(term.term)}
-                                </h3>
-                                <div class="tooltip absolute left-0 top-full mt-2 bg-gray-900 text-white p-3 rounded-lg shadow-lg z-10 w-64 pointer-events-none">
-                                    <div class="text-sm">${escapeHtml(term.description)}</div>
-                                    <div class="absolute -top-2 left-4 w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-gray-900"></div>
-                                </div>
-                            </div>
-                            <span class="text-xs text-gray-500">${term.category}</span>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <span class="text-yellow-500">${'★'.repeat(term.importance)}</span>
-                            <button 
-                                onclick="updateTerm('${term.id}', { bookmarked: !${term.bookmarked} })"
-                                class="${term.bookmarked ? 'text-yellow-500' : 'text-gray-300'} hover:text-yellow-500 transition"
-                            >
-                                ${term.bookmarked ? '⭐' : '☆'}
-                            </button>
-                            <button 
-                                onclick="deleteTerm('${term.id}')"
-                                class="text-red-500 hover:text-red-700 transition text-sm"
-                            >
-                                ×
-                            </button>
+            
+            if (viewMode === 'tag') {
+                // タグ形式の表示
+                container.className = 'flex flex-wrap gap-3 p-4 bg-white rounded-lg border';
+                container.innerHTML = filteredTerms.map(term => `
+                    <div class="term-tag ${term.completed ? 'completed' : ''} fade-in">
+                        <input 
+                            type="checkbox" 
+                            ${term.completed ? 'checked' : ''}
+                            onchange="updateTerm('${term.id}', { completed: this.checked })"
+                            class="checkbox"
+                        >
+                        <span onclick="openModal('${term.id}')" style="cursor: pointer;">
+                            ${escapeHtml(term.term)}
+                        </span>
+                        <div class="tooltip absolute left-0 top-full mt-2 bg-gray-900 text-white p-3 rounded-lg shadow-lg z-10 w-64">
+                            <div class="text-sm">${escapeHtml(term.description)}</div>
+                            <div class="absolute -top-2 left-4 w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-gray-900"></div>
                         </div>
                     </div>
-                    <p class="text-sm text-gray-600">${escapeHtml(term.description)}</p>
-                </div>
-            `).join('');
+                `).join('');
+            } else {
+                // カード形式の表示
+                container.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4';
+                container.innerHTML = filteredTerms.map(term => `
+                    <div class="term-card bg-white rounded-lg border p-4 ${term.completed ? 'completed bg-gray-50' : ''} fade-in">
+                        <div class="flex justify-between items-start mb-3">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2">
+                                    <input 
+                                        type="checkbox" 
+                                        ${term.completed ? 'checked' : ''}
+                                        onchange="updateTerm('${term.id}', { completed: this.checked })"
+                                        class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                                    >
+                                    <h3 class="term-name font-semibold text-gray-900 cursor-help relative">
+                                        ${escapeHtml(term.term)}
+                                    </h3>
+                                    <div class="tooltip absolute left-0 top-full mt-2 bg-gray-900 text-white p-3 rounded-lg shadow-lg z-10 w-64 pointer-events-none">
+                                        <div class="text-sm">${escapeHtml(term.description)}</div>
+                                        <div class="absolute -top-2 left-4 w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-gray-900"></div>
+                                    </div>
+                                </div>
+                                <span class="text-xs text-gray-500">${term.category}</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-yellow-500">${'★'.repeat(term.importance)}</span>
+                                <button 
+                                    onclick="updateTerm('${term.id}', { bookmarked: !${term.bookmarked} })"
+                                    class="${term.bookmarked ? 'text-yellow-500' : 'text-gray-300'} hover:text-yellow-500 transition"
+                                >
+                                    ${term.bookmarked ? '⭐' : '☆'}
+                                </button>
+                                <button 
+                                    onclick="openModal('${term.id}')"
+                                    class="text-blue-500 hover:text-blue-700 transition text-sm"
+                                >
+                                    ✏️
+                                </button>
+                                <button 
+                                    onclick="deleteTerm('${term.id}')"
+                                    class="text-red-500 hover:text-red-700 transition text-sm"
+                                >
+                                    ×
+                                </button>
+                            </div>
+                        </div>
+                        <p class="text-sm text-gray-600">${escapeHtml(term.description)}</p>
+                    </div>
+                `).join('');
+            }
         }
 
         // 統計情報の更新
@@ -515,14 +686,6 @@
             document.getElementById('totalCount').textContent = total;
             document.getElementById('progressRate').textContent = rate + '%';
             document.getElementById('progressBar').style.width = rate + '%';
-        }
-
-        // カテゴリ選択肢の更新
-        function updateCategories() {
-            const categories = [...new Set(terms.map(t => t.category))].filter(c => c);
-            const select = document.getElementById('categoryFilter');
-            select.innerHTML = '<option value="">全カテゴリ</option>' +
-                categories.map(c => `<option value="${c}">${c}</option>`).join('');
         }
 
         // ユーティリティ関数
