@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>暗記マスター - 学習支援アプリ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <style>
+        /* カスタムスタイル */
+        .term-card {
+            transition: all 0.3s ease;
+        }
+        .term-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(33, 150, 243, 0.15);
+        }
+        .completed .term-name {
+            text-decoration: line-through;
+            color: #6c757d;
+        }
+        .term-tag.completed span {
+            text-decoration: line-through;
+            color: #6c757d;
+        }
+        .tooltip {
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+        @media (min-width: 768px) {
+            .term-name:hover + .tooltip,
+            .term-tag:hover .tooltip {
+                visibility: visible;
+                opacity: 1;
+            }
+        }
+        .progress-bar {
+            transition: width 0.8s ease;
+        }
+        .fade-in {
+            animation: fadeIn 0.3s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .search-highlight {
+            background: linear-gradient(120deg, #fff3e0 0%, #ffe0b2 100%);
+            padding: 2px 4px;
+            border-radius: 2px;
+        }
+        .term-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 20px;
+            font-size: 14px;
+            transition: all 0.2s ease;
+            position: relative;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+        }
+        .term-tag:hover {
+            border-color: #3b82f6;
+            background: #f0f9ff;
+        }
+        .term-tag.completed {
+            background: #f3f4f6;
+            border-color: #d1d5db;
+        }
+        .term-tag .checkbox {
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0;
+        }
+        .view-toggle {
+            display: inline-flex;
+            background: #f3f4f6;
+            border-radius: 8px;
+            padding: 2px;
+        }
+        .view-toggle button {
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        .view-toggle button.active {
+            background: white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .page-container {
+            display: none;
+        }
+        .page-container.active {
+            display: block;
+        }
+        .syllabary-nav {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            padding: 12px;
+            background: white;
+            border-radius: 8px;
+            margin-bottom: 16px;
+        }
+        .syllabary-btn {
+            padding: 4px 8px;
+            font-size: 14px;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .syllabary-btn:hover {
+            background: #f3f4f6;
+            border-color: #9ca3af;
+        }
+        .syllabary-btn.active {
+            background: #3b82f6;
+            color: white;
+            border-color: #3b82f6;
+        }
+        .syllabary-section {
+            margin-bottom: 20px;
+        }
+        .syllabary-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #1f2937;
+            padding: 8px 12px;
+            background: linear-gradient(to right, #f3f4f6, transparent);
+            border-left: 3px solid #3b82f6;
+            margin-bottom: 12px;
+        }
+        /* スマホ対応 */
+        @media (max-width: 640px) {
+            .term-tag {
+                padding: 10px 12px;
+                font-size: 15px;
+            }
+            .mobile-menu-item {
+                padding: 12px 16px;
+                border-bottom: 1px solid #e5e7eb;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+            .mobile-menu-item:active {
+                background: #f3f4f6;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen flex flex-col">
+    <!-- メインページ -->
+    <div id="mainPage" class="page-container active flex flex-col min-h-screen">
+        <!-- ヘッダー -->
+        <header class="bg-white shadow-sm border-b">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between items-center h-16">
+                    <h1 class="text-xl font-bold text-gray-900">📚 暗記マスター</h1>
+                    <div class="flex items-center gap-2 sm:gap-4">
+                        <div class="view-toggle hidden sm:inline-flex">
+                            <button id="tagViewBtn" class="active">タグ</button>
+                            <button id="cardViewBtn">カード</button>
+                        </div>
+                        <button id="addTermBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition">
+                            + 追加
+                        </button>
+                        <button id="editPageBtn" class="bg-gray-600 hover:bg-gray-700 text-white px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition">
+                            編集
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- メインコンテンツ -->
+        <main class="flex-grow container mx-auto px-4 py-6 max-w-7xl">
+            <!-- 統計情報 -->
+            <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-6 mb-6">
+                <div class="grid grid-cols-3 gap-4 text-center">
+                    <div>
+                        <div class="text-sm text-blue-600 font-medium mb-1">理解済み</div>
+                        <div class="text-2xl font-bold text-blue-900" id="completedCount">0</div>
+                    </div>
+                    <div>
+                        <div class="text-sm text-blue-600 font-medium mb-1">総用語数</div>
+                        <div class="text-2xl font-bold text-blue-900" id="totalCount">0</div>
+                    </div>
+                    <div>
+                        <div class="text-sm text-blue-600 font-medium mb-1">理解率</div>
+                        <div class="text-2xl font-bold text-blue-900" id="progressRate">0%</div>
+                    </div>
+                </div>
+                <div class="mt-4 bg-gray-200 rounded-full h-3 overflow-hidden">
+                    <div id="progressBar" class="progress-bar bg-gradient-to-r from-green-400 to-green-600 h-full rounded-full" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <!-- 検索・フィルター・ソート -->
+            <div class="bg-white rounded-lg shadow-sm border p-4 mb-6">
+                <div class="flex flex-col gap-4">
+                    <div class="flex flex-col sm:flex-row gap-4">
+                        <input 
+                            type="text" 
+                            id="searchInput" 
+                            placeholder="用語名・解説で検索..." 
+                            class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                        >
+                        <select 
+                            id="sortSelect" 
+                            class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        >
+                            <option value="syllabary">五十音順</option>
+                            <option value="newest">新着順</option>
+                            <option value="importance">重要度順</option>
+                            <option value="category">カテゴリ順</option>
+                        </select>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <button id="filterAllBtn" class="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm">すべて</button>
+                        <button id="filterCompletedBtn" class="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg text-sm">理解済み</button>
+                        <button id="filterIncompleteBtn" class="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg text-sm">未理解</button>
+                        <button id="filterImportantBtn" class="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg text-sm">重要度★★★</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 五十音ナビゲーション（五十音順選択時のみ表示） -->
+            <div id="syllabaryNav" class="syllabary-nav hidden">
+                <!-- 動的に生成 -->
+            </div>
+
+            <!-- 用語リスト -->
+            <div id="termsList" class="mb-20">
+                <!-- 動的に生成 -->
+            </div>
+
+            <!-- 空の状態表示 -->
+            <div id="emptyState" class="hidden text-center py-12">
+                <div class="text-gray-400 text-6xl mb-4">📝</div>
+                <p class="text-gray-600 text-lg">まだ用語が登録されていません</p>
+                <p class="text-gray-500 mt-2">「+ 追加」ボタンから始めましょう</p>
+            </div>
+        </main>
+
+        <!-- フッタータブ -->
+        <footer class="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg sm:hidden">
+            <div class="grid grid-cols-4 divide-x">
+                <button class="tab-button active py-4 hover:bg-gray-50 transition text-xs" data-filter="all">
+                    <div>すべて</div>
+                </button>
+                <button class="tab-button py-4 hover:bg-gray-50 transition text-xs" data-filter="incomplete">
+                    <div>未理解</div>
+                </button>
+                <button class="tab-button py-4 hover:bg-gray-50 transition text-xs" data-filter="completed">
+                    <div>理解済み</div>
+                </button>
+                <button class="tab-button py-4 hover:bg-gray-50 transition text-xs" data-filter="bookmarked">
+                    <div>⭐</div>
+                </button>
+            </div>
+        </footer>
+    </div>
+
+    <!-- 編集ページ -->
+    <div id="editPage" class="page-container">
+        <header class="bg-white shadow-sm border-b">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between items-center h-16">
+                    <button id="backBtn" class="text-gray-600 hover:text-gray-900">
+                        ← 戻る
+                    </button>
+                    <h1 class="text-xl font-bold text-gray-900">用語編集</h1>
+                    <div></div>
+                </div>
+            </div>
+        </header>
+
+        <main class="container mx-auto px-4 py-6 max-w-7xl">
+            <div class="bg-white rounded-lg shadow-sm border p-4 mb-4">
+                <input 
+                    type="text" 
+                    id="editSearchInput" 
+                    placeholder="用語を検索..." 
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+            </div>
+
+            <div id="editTermsList" class="space-y-2">
+                <!-- 動的に生成 -->
+            </div>
+        </main>
+    </div>
+
+    <!-- 用語追加/編集モーダル -->
+    <div id="termModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <h2 id="modalTitle" class="text-xl font-bold mb-4">新しい用語を追加</h2>
+            <form id="termForm">
+                <input type="hidden" id="editTermId">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">用語</label>
+                    <input 
+                        type="text" 
+                        id="termInput" 
+                        required 
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        placeholder="例: アクセス権"
+                    >
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">読み（ひらがな）</label>
+                    <input 
+                        type="text" 
+                        id="readingInput" 
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        placeholder="例: あくせすけん"
+                    >
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">解説</label>
+                    <textarea 
+                        id="descriptionInput" 
+                        required 
+                        rows="3"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        placeholder="例: 情報や資源に対する利用許可のこと"
+                    ></textarea>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">カテゴリ</label>
+                    <input 
+                        type="text" 
+                        id="categoryInput" 
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        placeholder="例: IT用語"
+                    >
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">重要度</label>
+                    <select 
+                        id="importanceInput" 
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    >
+                        <option value="1">★ 基本</option>
+                        <option value="2" selected>★★ 重要</option>
+                        <option value="3">★★★ 最重要</option>
+                    </select>
+                </div>
+                <div class="flex gap-3 justify-end">
+                    <button 
+                        type="button" 
+                        id="cancelModalBtn" 
+                        class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition"
+                    >
+                        キャンセル
+                    </button>
+                    <button 
+                        type="submit" 
+                        id="submitBtn"
+                        class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition"
+                    >
+                        追加
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Firebase設定（環境に応じて変更してください）
+        const firebaseConfig = {
+            // ここにFirebaseの設定を入力
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        // 開発用のローカルストレージを使用（Firebaseが設定されていない場合）
+        let useLocalStorage = false;
+        try {
+            firebase.initializeApp(firebaseConfig);
+            var db = firebase.firestore();
+        } catch (error) {
+            console.log('Firebaseが設定されていないため、ローカルストレージを使用します');
+            useLocalStorage = true;
+        }
+
+        // アプリケーションの状態管理
+        let terms = [];
+        let filteredTerms = [];
+        let currentFilter = 'all';
+        let viewMode = 'tag'; // 'tag' or 'card'
+        let editingTermId = null;
+        let currentSort = 'syllabary';
+
+        // 初期化
+        document.addEventListener('DOMContentLoaded', () => {
+            loadTerms();
+            setupEventListeners();
+            loadSampleData();
+        });
+
+        // 五十音ナビゲーションの生成
+        function generateSyllabaryNav() {
+            const syllabaryOrder = [
+                'あ', 'か', 'さ', 'た', 'な', 'は', 'ま', 'や', 'ら', 'わ', '英数', 'その他'
+            ];
+            
+            const nav = document.getElementById('syllabaryNav');
+            nav.innerHTML = syllabaryOrder.map(char => 
+                `<button class="syllabary-btn" data-syllabary="${char}">${char}</button>`
+            ).join('');
+            
+            // イベントリスナー追加
+            nav.querySelectorAll('.syllabary-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const targetId = `syllabary-${btn.dataset.syllabary}`;
+                    const targetElement = document.getElementById(targetId);
+                    if (targetElement) {
+                        targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                });
+            });
+        }
+
+        // 五十音グループを取得
+        function getSyllabaryGroup(reading) {
+            if (!reading) return 'その他';
+            const firstChar = reading.charAt(0);
+            
+            const groups = {
+                'あ': ['あ', 'い', 'う', 'え', 'お'],
+                'か': ['か', 'き', 'く', 'け', 'こ', 'が', 'ぎ', 'ぐ', 'げ', 'ご'],
+                'さ': ['さ', 'し', 'す', 'せ', 'そ', 'ざ', 'じ', 'ず', 'ぜ', 'ぞ'],
+                'た': ['た', 'ち', 'つ', 'て', 'と', 'だ', 'ぢ', 'づ', 'で', 'ど'],
+                'な': ['な', 'に', 'ぬ', 'ね', 'の'],
+                'は': ['は', 'ひ', 'ふ', 'へ', 'ほ', 'ば', 'び', 'ぶ', 'べ', 'ぼ', 'ぱ', 'ぴ', 'ぷ', 'ぺ', 'ぽ'],
+                'ま': ['ま', 'み', 'む', 'め', 'も'],
+                'や': ['や', 'ゆ', 'よ'],
+                'ら': ['ら', 'り', 'る', 'れ', 'ろ'],
+                'わ': ['わ', 'を', 'ん']
+            };
+            
+            for (const [group, chars] of Object.entries(groups)) {
+                if (chars.includes(firstChar)) {
+                    return group;
+                }
+            }
+            
+            if (/[a-zA-Z0-9]/.test(firstChar)) {
+                return '英数';
+            }
+            
+            return 'その他';
+        }
+
+        // サンプルデータの読み込み
+        function loadSampleData() {
+            const storageKey = 'memorizeSampleLoaded';
+            if (localStorage.getItem(storageKey)) return;
+
+            const sampleTerms = [
+                { term: 'IT統括', reading: 'あいてぃとうかつ', description: '組織内の情報技術全般を管理・統括すること', category: 'IT用語', importance: 2 },
+                { term: 'アクセス権', reading: 'あくせすけん', description: '情報や資源に対する利用許可のこと', category: 'IT用語', importance: 3 },
+                { term: '委任命令', reading: 'いにんめいれい', description: '法律の委任に基づいて制定される命令', category: '法律', importance: 2 },
+                { term: 'ウィキ', reading: 'うぃき', description: '共同編集が可能なWebサイトシステム', category: 'Web', importance: 2 },
+                { term: '営業譲渡', reading: 'えいぎょうじょうと', description: '事業の全部または一部を他者に譲り渡すこと', category: 'ビジネス', importance: 3 },
+                { term: '汚染者負担の原則', reading: 'おせんしゃふたんのげんそく', description: '環境汚染を引き起こした者が対策費用を負担すべきという原則', category: '環境', importance: 3 },
+                { term: '過失', reading: 'かしつ', description: '注意義務違反による法的責任', category: '法律', importance: 3 },
+                { term: '基本的人権', reading: 'きほんてきじんけん', description: '人間が生まれながらに持つ不可侵の権利', category: '憲法', importance: 3 },
+                { term: '権利能力', reading: 'けんりのうりょく', description: '権利義務の主体となりうる地位', category: '民法', importance: 3 },
+                { term: '裁判権', reading: 'さいばんけん', description: '法律上の争訟を解決する権限', category: '法律', importance: 3 },
+                { term: '信義誠実の原則', reading: 'しんぎせいじつのげんそく', description: '権利行使と義務履行における誠実性の要求', category: '民法', importance: 3 },
+                { term: '対抗要件', reading: 'たいこうようけん', description: '第三者に権利変動を主張するための要件', category: '民法', importance: 3 },
+                { term: '内閣', reading: 'ないかく', description: '行政権の主体', category: '憲法', importance: 3 },
+                { term: '判例', reading: 'はんれい', description: '裁判所が示した法的判断', category: '法律', importance: 3 },
+                { term: '民法', reading: 'みんぽう', description: '私人間の法律関係を規律する法律', category: '法律', importance: 3 },
+                { term: '約款', reading: 'やっかん', description: '多数の契約で用いられる定型的な契約条項', category: '民法', importance: 2 },
+                { term: '利息', reading: 'りそく', description: '金銭使用の対価', category: '民法', importance: 1 },
+                { term: '和解', reading: 'わかい', description: '争いのある事項について互譲により解決する契約', category: '民法', importance: 2 },
+                { term: 'API', reading: 'えーぴーあい', description: 'Application Programming Interfaceの略', category: 'IT用語', importance: 3 },
+            ];
+
+            sampleTerms.forEach(termData => {
+                termData.id = generateId();
+                termData.completed = false;
+                termData.bookmarked = false;
+                termData.createdAt = new Date().toISOString();
+                saveTerm(termData);
+            });
+
+            localStorage.setItem(storageKey, 'true');
+            loadTerms();
+        }
+
+        // イベントリスナーの設定
+        function setupEventListeners() {
+            // ページ切り替え
+            document.getElementById('editPageBtn').addEventListener('click', () => {
+                showEditPage();
+            });
+
+            document.getElementById('backBtn').addEventListener('click', () => {
+                showMainPage();
+            });
+
+            // 表示切り替え
+            document.getElementById('tagViewBtn').addEventListener('click', () => {
+                viewMode = 'tag';
+                document.getElementById('tagViewBtn').classList.add('active');
+                document.getElementById('cardViewBtn').classList.remove('active');
+                displayTerms();
+            });
+
+            document.getElementById('cardViewBtn').addEventListener('click', () => {
+                viewMode = 'card';
+                document.getElementById('cardViewBtn').classList.add('active');
+                document.getElementById('tagViewBtn').classList.remove('active');
+                displayTerms();
+            });
+
+            // ソート変更
+            document.getElementById('sortSelect').addEventListener('change', (e) => {
+                currentSort = e.target.value;
+                if (currentSort === 'syllabary') {
+                    document.getElementById('syllabaryNav').classList.remove('hidden');
+                    generateSyllabaryNav();
+                } else {
+                    document.getElementById('syllabaryNav').classList.add('hidden');
+                }
+                filterAndDisplayTerms();
+            });
+
+            // モーダル関連
+            document.getElementById('addTermBtn').addEventListener('click', () => {
+                openModal();
+            });
+
+            document.getElementById('cancelModalBtn').addEventListener('click', () => {
+                closeModal();
+            });
+
+            // 用語追加/編集フォーム
+            document.getElementById('termForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                const termData = {
+                    term: document.getElementById('termInput').value,
+                    reading: document.getElementById('readingInput').value || document.getElementById('termInput').value,
+                    description: document.getElementById('descriptionInput').value,
+                    category: document.getElementById('categoryInput').value || '未分類',
+                    importance: parseInt(document.getElementById('importanceInput').value),
+                };
+
+                if (editingTermId) {
+                    await updateTerm(editingTermId, termData);
+                } else {
+                    termData.id = generateId();
+                    termData.completed = false;
+                    termData.bookmarked = false;
+                    termData.createdAt = new Date().toISOString();
+                    await saveTerm(termData);
+                }
+
+                closeModal();
+                loadTerms();
+            });
+
+            // 検索
+            document.getElementById('searchInput').addEventListener('input', (e) => {
+                filterAndDisplayTerms();
+            });
+
+            document.getElementById('editSearchInput').addEventListener('input', (e) => {
+                displayEditTerms(e.target.value);
+            });
+
+            // フィルターボタン
+            document.getElementById('filterAllBtn').addEventListener('click', () => {
+                setActiveFilter('all');
+            });
+            document.getElementById('filterCompletedBtn').addEventListener('click', () => {
+                setActiveFilter('completed');
+            });
+            document.getElementById('filterIncompleteBtn').addEventListener('click', () => {
+                setActiveFilter('incomplete');
+            });
+            document.getElementById('filterImportantBtn').addEventListener('click', () => {
+                setActiveFilter('important');
+            });
+
+            // タブ切り替え（モバイル）
+            document.querySelectorAll('.tab-button').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('bg-blue-50', 'border-t-2', 'border-blue-500'));
+                    button.classList.add('bg-blue-50', 'border-t-2', 'border-blue-500');
+                    currentFilter = button.dataset.filter;
+                    filterAndDisplayTerms();
+                });
+            });
+        }
+
+        // ページ切り替え
+        function showMainPage() {
+            document.getElementById('mainPage').classList.add('active');
+            document.getElementById('editPage').classList.remove('active');
+        }
+
+        function showEditPage() {
+            document.getElementById('mainPage').classList.remove('active');
+            document.getElementById('editPage').classList.add('active');
+            displayEditTerms();
+        }
+
+        // 編集ページの表示
+        function displayEditTerms(searchTerm = '') {
+            const container = document.getElementById('editTermsList');
+            let displayTerms = [...terms];
+            
+            if (searchTerm) {
+                displayTerms = displayTerms.filter(t => 
+                    t.term.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    t.description.toLowerCase().includes(searchTerm.toLowerCase())
+                );
+            }
+
+            container.innerHTML = displayTerms.map(term => `
+                <div class="bg-white border rounded-lg p-4 mobile-menu-item">
+                    <div class="flex-1">
+                        <h3 class="font-semibold text-gray-900">${escapeHtml(term.term)}</h3>
+                        <p class="text-sm text-gray-600">${escapeHtml(term.description)}</p>
+                        <div class="flex gap-2 mt-2">
+                            <button 
+                                onclick="openModal('${term.id}')"
+                                class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm"
+                            >
+                                編集
+                            </button>
+                            <button 
+                                onclick="deleteTerm('${term.id}')"
+                                class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm"
+                            >
+                                削除
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // フィルター設定
+        function setActiveFilter(filter) {
+            currentFilter = filter;
+            const buttons = {
+                'all': document.getElementById('filterAllBtn'),
+                'completed': document.getElementById('filterCompletedBtn'),
+                'incomplete': document.getElementById('filterIncompleteBtn'),
+                'important': document.getElementById('filterImportantBtn')
+            };
+
+            Object.values(buttons).forEach(btn => {
+                btn.classList.remove('bg-blue-600', 'text-white');
+                btn.classList.add('bg-gray-200', 'text-gray-700');
+            });
+
+            if (buttons[filter]) {
+                buttons[filter].classList.remove('bg-gray-200', 'text-gray-700');
+                buttons[filter].classList.add('bg-blue-600', 'text-white');
+            }
+
+            filterAndDisplayTerms();
+        }
+
+        // モーダル操作
+        function openModal(termId = null) {
+            const modal = document.getElementById('termModal');
+            const form = document.getElementById('termForm');
+            
+            if (termId) {
+                const term = terms.find(t => t.id === termId);
+                if (term) {
+                    editingTermId = termId;
+                    document.getElementById('modalTitle').textContent = '用語を編集';
+                    document.getElementById('submitBtn').textContent = '更新';
+                    document.getElementById('editTermId').value = termId;
+                    document.getElementById('termInput').value = term.term;
+                    document.getElementById('readingInput').value = term.reading || '';
+                    document.getElementById('descriptionInput').value = term.description;
+                    document.getElementById('categoryInput').value = term.category;
+                    document.getElementById('importanceInput').value = term.importance;
+                }
+            } else {
+                editingTermId = null;
+                document.getElementById('modalTitle').textContent = '新しい用語を追加';
+                document.getElementById('submitBtn').textContent = '追加';
+                form.reset();
+            }
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('termModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            document.getElementById('termForm').reset();
+            editingTermId = null;
+        }
+
+        // 用語の読み込み
+        async function loadTerms() {
+            if (useLocalStorage) {
+                const stored = localStorage.getItem('memorizeTerms');
+                terms = stored ? JSON.parse(stored) : [];
+            } else {
+                try {
+                    const snapshot = await db.collection('terms').orderBy('createdAt', 'desc').get();
+                    terms = [];
+                    snapshot.forEach(doc => {
+                        terms.push({ id: doc.id, ...doc.data() });
+                    });
+                } catch (error) {
+                    console.error('データの読み込みに失敗しました:', error);
+                    terms = [];
+                }
+            }
+
+            filterAndDisplayTerms();
+        }
+
+        // 用語の保存
+        async function saveTerm(termData) {
+            if (useLocalStorage) {
+                const stored = localStorage.getItem('memorizeTerms');
+                const terms = stored ? JSON.parse(stored) : [];
+                terms.push(termData);
+                localStorage.setItem('memorizeTerms', JSON.stringify(terms));
+            } else {
+                try {
+                    await db.collection('terms').doc(termData.id).set(termData);
+                } catch (error) {
+                    console.error('保存に失敗しました:', error);
+                }
+            }
+        }
+
+        // 用語の更新
+        async function updateTerm(termId, updates) {
+            const index = terms.findIndex(t => t.id === termId);
+            if (index !== -1) {
+                terms[index] = { ...terms[index], ...updates };
+                
+                if (useLocalStorage) {
+                    localStorage.setItem('memorizeTerms', JSON.stringify(terms));
+                } else {
+                    try {
+                        await db.collection('terms').doc(termId).update(updates);
+                    } catch (error) {
+                        console.error('更新に失敗しました:', error);
+                    }
+                }
+                
+                filterAndDisplayTerms();
+                displayEditTerms(document.getElementById('editSearchInput').value);
+            }
+        }
+
+        // 用語の削除
+        async function deleteTerm(termId) {
+            if (confirm('この用語を削除しますか？')) {
+                terms = terms.filter(t => t.id !== termId);
+                
+                if (useLocalStorage) {
+                    localStorage.setItem('memorizeTerms', JSON.stringify(terms));
+                } else {
+                    try {
+                        await db.collection('terms').doc(termId).delete();
+                    } catch (error) {
+                        console.error('削除に失敗しました:', error);
+                    }
+                }
+                
+                filterAndDisplayTerms();
+                displayEditTerms(document.getElementById('editSearchInput').value);
+            }
+        }
+
+        // フィルター処理とソート
+        function filterAndDisplayTerms() {
+            filteredTerms = [...terms];
+
+            // フィルター適用
+            if (currentFilter === 'completed') {
+                filteredTerms = filteredTerms.filter(t => t.completed);
+            } else if (currentFilter === 'incomplete') {
+                filteredTerms = filteredTerms.filter(t => !t.completed);
+            } else if (currentFilter === 'bookmarked') {
+                filteredTerms = filteredTerms.filter(t => t.bookmarked);
+            } else if (currentFilter === 'important') {
+                filteredTerms = filteredTerms.filter(t => t.importance === 3);
+            }
+
+            // 検索フィルター
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            if (searchTerm) {
+                filteredTerms = filteredTerms.filter(t => 
+                    t.term.toLowerCase().includes(searchTerm) ||
+                    t.description.toLowerCase().includes(searchTerm)
+                );
+            }
+
+            // ソート
+            if (currentSort === 'syllabary') {
+                // 五十音順
+                filteredTerms.sort((a, b) => {
+                    const aReading = a.reading || a.term;
+                    const bReading = b.reading || b.term;
+                    return aReading.localeCompare(bReading, 'ja');
+                });
+            } else if (currentSort === 'newest') {
+                // 新着順
+                filteredTerms.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+            } else if (currentSort === 'importance') {
+                // 重要度順
+                filteredTerms.sort((a, b) => b.importance - a.importance);
+            } else if (currentSort === 'category') {
+                // カテゴリ順
+                filteredTerms.sort((a, b) => a.category.localeCompare(b.category, 'ja'));
+            }
+
+            displayTerms();
+            updateStats();
+        }
+
+        // 用語の表示
+        function displayTerms() {
+            const container = document.getElementById('termsList');
+            const emptyState = document.getElementById('emptyState');
+            
+            if (filteredTerms.length === 0) {
+                container.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                return;
+            }
+            
+            emptyState.classList.add('hidden');
+            
+            if (currentSort === 'syllabary' && viewMode === 'tag') {
+                // 五十音順でタグ表示の場合はグループ化
+                const groups = {};
+                filteredTerms.forEach(term => {
+                    const group = getSyllabaryGroup(term.reading || term.term);
+                    if (!groups[group]) {
+                        groups[group] = [];
+                    }
+                    groups[group].push(term);
+                });
+
+                const syllabaryOrder = ['あ', 'か', 'さ', 'た', 'な', 'は', 'ま', 'や', 'ら', 'わ', '英数', 'その他'];
+                
+                container.innerHTML = syllabaryOrder.map(group => {
+                    if (!groups[group] || groups[group].length === 0) return '';
+                    return `
+                        <div class="syllabary-section" id="syllabary-${group}">
+                            <div class="syllabary-title">${group}行</div>
+                            <div class="flex flex-wrap gap-3 p-4 bg-white rounded-lg border">
+                                ${groups[group].map(term => `
+                                    <div class="term-tag ${term.completed ? 'completed' : ''} fade-in">
+                                        <input 
+                                            type="checkbox" 
+                                            ${term.completed ? 'checked' : ''}
+                                            onchange="updateTerm('${term.id}', { completed: this.checked })"
+                                            class="checkbox"
+                                        >
+                                        <span>${escapeHtml(term.term)}</span>
+                                        <div class="tooltip absolute left-0 top-full mt-2 bg-gray-900 text-white p-3 rounded-lg shadow-lg z-10 w-64">
+                                            <div class="text-sm">${escapeHtml(term.description)}</div>
+                                            <div class="absolute -top-2 left-4 w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-gray-900"></div>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } else if (viewMode === 'tag') {
+                // タグ形式の表示（グループ化なし）
+                container.className = 'flex flex-wrap gap-3 p-4 bg-white rounded-lg border';
+                container.innerHTML = filteredTerms.map(term => `
+                    <div class="term-tag ${term.completed ? 'completed' : ''} fade-in">
+                        <input 
+                            type="checkbox" 
+                            ${term.completed ? 'checked' : ''}
+                            onchange="updateTerm('${term.id}', { completed: this.checked })"
+                            class="checkbox"
+                        >
+                        <span>${escapeHtml(term.term)}</span>
+                        <div class="tooltip absolute left-0 top-full mt-2 bg-gray-900 text-white p-3 rounded-lg shadow-lg z-10 w-64">
+                            <div class="text-sm">${escapeHtml(term.description)}</div>
+                            <div class="absolute -top-2 left-4 w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-gray-900"></div>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                // カード形式の表示
+                container.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4';
+                container.innerHTML = filteredTerms.map(term => `
+                    <div class="term-card bg-white rounded-lg border p-4 ${term.completed ? 'completed bg-gray-50' : ''} fade-in">
+                        <div class="flex justify-between items-start mb-3">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2">
+                                    <input 
+                                        type="checkbox" 
+                                        ${term.completed ? 'checked' : ''}
+                                        onchange="updateTerm('${term.id}', { completed: this.checked })"
+                                        class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                                    >
+                                    <h3 class="term-name font-semibold text-gray-900 cursor-help relative">
+                                        ${escapeHtml(term.term)}
+                                    </h3>
+                                    <div class="tooltip absolute left-0 top-full mt-2 bg-gray-900 text-white p-3 rounded-lg shadow-lg z-10 w-64 pointer-events-none">
+                                        <div class="text-sm">${escapeHtml(term.description)}</div>
+                                        <div class="absolute -top-2 left-4 w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-gray-900"></div>
+                                    </div>
+                                </div>
+                                <span class="text-xs text-gray-500">${term.category}</span>
+                            </div>
+                            <div class="flex items-center gap-1">
+                                <span class="text-yellow-500 text-sm">${'★'.repeat(term.importance)}</span>
+                                <button 
+                                    onclick="updateTerm('${term.id}', { bookmarked: !${term.bookmarked} })"
+                                    class="${term.bookmarked ? 'text-yellow-500' : 'text-gray-300'} hover:text-yellow-500 transition text-lg"
+                                >
+                                    ${term.bookmarked ? '⭐' : '☆'}
+                                </button>
+                            </div>
+                        </div>
+                        <p class="text-sm text-gray-600">${escapeHtml(term.description)}</p>
+                    </div>
+                `).join('');
+            }
+        }
+
+        // 統計情報の更新
+        function updateStats() {
+            const total = terms.length;
+            const completed = terms.filter(t => t.completed).length;
+            const rate = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+            document.getElementById('completedCount').textContent = completed;
+            document.getElementById('totalCount').textContent = total;
+            document.getElementById('progressRate').textContent = rate + '%';
+            document.getElementById('progressBar').style.width = rate + '%';
+        }
+
+        // ユーティリティ関数
+        function generateId() {
+            return Date.now().toString(36) + Math.random().toString(36).substr(2);
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
