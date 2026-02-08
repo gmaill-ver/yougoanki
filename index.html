@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>暗記マスター - 学習支援アプリ</title>
+    <title>行政書士 用語暗記マスター</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         /* カスタムスタイル */
@@ -202,7 +202,7 @@
         <header class="bg-white shadow-sm border-b">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="flex justify-between items-center h-16">
-                    <h1 class="text-xl font-bold text-gray-900">📚 暗記マスター</h1>
+                    <h1 class="text-xl font-bold text-gray-900">📚 行政書士 用語暗記</h1>
                     <div class="flex items-center gap-2 sm:gap-4">
                         <div class="view-toggle hidden sm:inline-flex">
                             <button id="tagViewBtn" class="active">タグ</button>
@@ -487,29 +487,115 @@
 
         // サンプルデータの読み込み
         function loadSampleData() {
-            const storageKey = 'memorizeSampleLoaded';
+            const storageKey = 'memorizeSampleLoaded_gyoseishoshi';
             if (localStorage.getItem(storageKey)) return;
+            localStorage.removeItem('memorizeTerms');
+            terms = [];
 
             const sampleTerms = [
-                { term: 'IT統括', reading: 'あいてぃとうかつ', description: '組織内の情報技術全般を管理・統括すること', category: 'IT用語', importance: 2 },
-                { term: 'アクセス権', reading: 'あくせすけん', description: '情報や資源に対する利用許可のこと', category: 'IT用語', importance: 3 },
-                { term: '委任命令', reading: 'いにんめいれい', description: '法律の委任に基づいて制定される命令', category: '法律', importance: 2 },
-                { term: 'ウィキ', reading: 'うぃき', description: '共同編集が可能なWebサイトシステム', category: 'Web', importance: 2 },
-                { term: '営業譲渡', reading: 'えいぎょうじょうと', description: '事業の全部または一部を他者に譲り渡すこと', category: 'ビジネス', importance: 3 },
-                { term: '汚染者負担の原則', reading: 'おせんしゃふたんのげんそく', description: '環境汚染を引き起こした者が対策費用を負担すべきという原則', category: '環境', importance: 3 },
-                { term: '過失', reading: 'かしつ', description: '注意義務違反による法的責任', category: '法律', importance: 3 },
-                { term: '基本的人権', reading: 'きほんてきじんけん', description: '人間が生まれながらに持つ不可侵の権利', category: '憲法', importance: 3 },
-                { term: '権利能力', reading: 'けんりのうりょく', description: '権利義務の主体となりうる地位', category: '民法', importance: 3 },
-                { term: '裁判権', reading: 'さいばんけん', description: '法律上の争訟を解決する権限', category: '法律', importance: 3 },
-                { term: '信義誠実の原則', reading: 'しんぎせいじつのげんそく', description: '権利行使と義務履行における誠実性の要求', category: '民法', importance: 3 },
-                { term: '対抗要件', reading: 'たいこうようけん', description: '第三者に権利変動を主張するための要件', category: '民法', importance: 3 },
-                { term: '内閣', reading: 'ないかく', description: '行政権の主体', category: '憲法', importance: 3 },
-                { term: '判例', reading: 'はんれい', description: '裁判所が示した法的判断', category: '法律', importance: 3 },
-                { term: '民法', reading: 'みんぽう', description: '私人間の法律関係を規律する法律', category: '法律', importance: 3 },
-                { term: '約款', reading: 'やっかん', description: '多数の契約で用いられる定型的な契約条項', category: '民法', importance: 2 },
-                { term: '利息', reading: 'りそく', description: '金銭使用の対価', category: '民法', importance: 1 },
-                { term: '和解', reading: 'わかい', description: '争いのある事項について互譲により解決する契約', category: '民法', importance: 2 },
-                { term: 'API', reading: 'えーぴーあい', description: 'Application Programming Interfaceの略', category: 'IT用語', importance: 3 },
+                // 憲法
+                { term: '国民主権', reading: 'こくみんしゅけん', description: '国の政治のあり方を最終的に決定する権力が国民にあるとする原理', category: '憲法', importance: 3 },
+                { term: '基本的人権', reading: 'きほんてきじんけん', description: '人間が生まれながらに持つ侵すことのできない永久の権利（憲法11条・97条）', category: '憲法', importance: 3 },
+                { term: '平和主義', reading: 'へいわしゅぎ', description: '戦争放棄・戦力不保持・交戦権否認を定める憲法の基本原理（9条）', category: '憲法', importance: 3 },
+                { term: '法の下の平等', reading: 'ほうのもとのびょうどう', description: 'すべて国民は法の下に平等であり差別されない（憲法14条）', category: '憲法', importance: 3 },
+                { term: '表現の自由', reading: 'ひょうげんのじゆう', description: '言論・出版その他一切の表現の自由を保障（憲法21条）。精神的自由の中核', category: '憲法', importance: 3 },
+                { term: '信教の自由', reading: 'しんきょうのじゆう', description: '信仰・宗教的行為・宗教的結社の自由を保障（憲法20条）。政教分離原則を含む', category: '憲法', importance: 2 },
+                { term: '職業選択の自由', reading: 'しょくぎょうせんたくのじゆう', description: '何人も公共の福祉に反しない限り職業を選択する自由を有する（憲法22条）', category: '憲法', importance: 2 },
+                { term: '財産権', reading: 'ざいさんけん', description: '財産権の不可侵と公共の福祉による制限（憲法29条）。正当な補償の下に公用収用可能', category: '憲法', importance: 3 },
+                { term: '生存権', reading: 'せいぞんけん', description: '健康で文化的な最低限度の生活を営む権利（憲法25条）。プログラム規定説が通説', category: '憲法', importance: 3 },
+                { term: '裁判を受ける権利', reading: 'さいばんをうけるけんり', description: '何人も裁判所において裁判を受ける権利を奪われない（憲法32条）', category: '憲法', importance: 2 },
+                { term: '違憲審査権', reading: 'いけんしんさけん', description: '裁判所が法律等の合憲性を審査する権限（憲法81条）。付随的審査制', category: '憲法', importance: 3 },
+                { term: '三権分立', reading: 'さんけんぶんりつ', description: '国家権力を立法・行政・司法に分け相互に抑制・均衡させる原理', category: '憲法', importance: 3 },
+                { term: '内閣総理大臣', reading: 'ないかくそうりだいじん', description: '内閣の首長。国会議員の中から国会の議決で指名（憲法67条）', category: '憲法', importance: 2 },
+                { term: '衆議院の優越', reading: 'しゅうぎいんのゆうえつ', description: '予算先議権・条約承認・内閣総理大臣指名・法律案再議決で衆議院が優越', category: '憲法', importance: 3 },
+                { term: '二重の基準論', reading: 'にじゅうのきじゅんろん', description: '精神的自由の規制は経済的自由より厳格な基準で審査すべきとする理論', category: '憲法', importance: 3 },
+                { term: '公共の福祉', reading: 'こうきょうのふくし', description: '人権を制約する根拠。一元的内在制約説が通説', category: '憲法', importance: 3 },
+                { term: '適正手続の保障', reading: 'てきせいてつづきのほしょう', description: '法律の定める手続によらなければ刑罰を科されない（憲法31条）。行政手続にも及ぶ', category: '憲法', importance: 3 },
+                { term: '国政調査権', reading: 'こくせいちょうさけん', description: '国会の各議院が国政に関する調査を行う権限（憲法62条）', category: '憲法', importance: 2 },
+                // 行政法
+                { term: '法律による行政の原理', reading: 'ほうりつによるぎょうせいのげんり', description: '行政活動は法律に基づき法律に従って行われなければならないとする原理', category: '行政法', importance: 3 },
+                { term: '法律の留保', reading: 'ほうりつのりゅうほ', description: '行政活動には法律の根拠が必要とする原則。侵害留保説が伝統的通説', category: '行政法', importance: 3 },
+                { term: '行政行為', reading: 'ぎょうせいこうい', description: '行政庁が法律に基づき一方的に国民の権利義務を具体的に決定する行為', category: '行政法', importance: 3 },
+                { term: '行政裁量', reading: 'ぎょうせいさいりょう', description: '行政庁に認められた判断の余地。覊束裁量と自由裁量に分類', category: '行政法', importance: 3 },
+                { term: '公定力', reading: 'こうていりょく', description: '行政行為は取消されるまで有効として通用する力', category: '行政法', importance: 3 },
+                { term: '不可争力', reading: 'ふかそうりょく', description: '出訴期間経過後は行政行為の効力を争えなくなる力', category: '行政法', importance: 3 },
+                { term: '不可変更力', reading: 'ふかへんこうりょく', description: '行政庁自身も行政行為を変更できなくなる力。裁決・審決に認められる', category: '行政法', importance: 2 },
+                { term: '取消しと撤回', reading: 'とりけしとてっかい', description: '取消し＝成立時の瑕疵を理由に遡及的に効力を失わせる。撤回＝後発的事由により将来に向かって効力を失わせる', category: '行政法', importance: 3 },
+                { term: '行政手続法', reading: 'ぎょうせいてつづきほう', description: '申請に対する処分・不利益処分・行政指導・届出・命令等制定の手続を定める法律', category: '行政法', importance: 3 },
+                { term: '聴聞', reading: 'ちょうもん', description: '不利益処分のうち許認可の取消し等重大な処分の際に行う意見聴取手続', category: '行政法', importance: 3 },
+                { term: '弁明の機会の付与', reading: 'べんめいのきかいのふよ', description: '聴聞を要しない不利益処分の際に行う簡易な意見聴取手続', category: '行政法', importance: 2 },
+                { term: '理由の提示', reading: 'りゆうのていじ', description: '申請拒否処分・不利益処分の際に理由を示す義務（行政手続法8条・14条）', category: '行政法', importance: 3 },
+                { term: '行政指導', reading: 'ぎょうせいしどう', description: '行政機関が任意の協力を求める非権力的事実行為。相手方の任意性を確保する必要', category: '行政法', importance: 3 },
+                { term: '行政代執行', reading: 'ぎょうせいだいしっこう', description: '代替的作為義務の不履行に対し行政庁が自ら又は第三者に履行させる強制執行手段', category: '行政法', importance: 3 },
+                { term: '即時強制', reading: 'そくじきょうせい', description: '義務の不履行を前提とせず直接に身体・財産に実力を行使する行政作用', category: '行政法', importance: 2 },
+                { term: '行政不服審査法', reading: 'ぎょうせいふふくしんさほう', description: '行政庁の処分に不服がある者が行政機関に対して不服を申し立てる制度を定める法律', category: '行政法', importance: 3 },
+                { term: '審査請求', reading: 'しんさせいきゅう', description: '行政不服審査法における不服申立ての基本類型。処分庁の最上級行政庁に対して行う', category: '行政法', importance: 3 },
+                { term: '審理員', reading: 'しんりいん', description: '審査請求の審理を行う者。処分に関与していない者から指名', category: '行政法', importance: 2 },
+                { term: '行政事件訴訟法', reading: 'ぎょうせいじけんそしょうほう', description: '行政事件に関する訴訟手続を定める法律。抗告訴訟・当事者訴訟・民衆訴訟・機関訴訟', category: '行政法', importance: 3 },
+                { term: '取消訴訟', reading: 'とりけしそしょう', description: '行政庁の処分の取消しを求める訴訟。抗告訴訟の中心的類型', category: '行政法', importance: 3 },
+                { term: '処分性', reading: 'しょぶんせい', description: '取消訴訟の対象となるための要件。公権力の主体たる国等が行う行為で直接国民の権利義務を形成し又はその範囲を確定する法的効果を有するもの', category: '行政法', importance: 3 },
+                { term: '原告適格', reading: 'げんこくてきかく', description: '取消訴訟を提起できる「法律上の利益を有する者」の範囲', category: '行政法', importance: 3 },
+                { term: '出訴期間', reading: 'しゅっそきかん', description: '取消訴訟の提起期間。処分を知った日から6か月・処分の日から1年', category: '行政法', importance: 3 },
+                { term: '義務付け訴訟', reading: 'ぎむづけそしょう', description: '行政庁に一定の処分をすべきことを命じる判決を求める訴訟', category: '行政法', importance: 3 },
+                { term: '差止訴訟', reading: 'さしとめそしょう', description: '行政庁が一定の処分をすべきでないのにしようとする場合にその差止めを求める訴訟', category: '行政法', importance: 2 },
+                { term: '仮の義務付け・仮の差止め', reading: 'かりのぎむづけかりのさしとめ', description: '義務付け訴訟・差止訴訟に付随する仮の救済制度', category: '行政法', importance: 2 },
+                { term: '執行停止', reading: 'しっこうていし', description: '取消訴訟提起後に処分の効力等を暫定的に停止する制度。執行不停止原則の例外', category: '行政法', importance: 3 },
+                { term: '国家賠償法1条', reading: 'こっかばいしょうほういちじょう', description: '公権力の行使に当たる公務員の故意又は過失による違法な加害行為に対する国等の賠償責任', category: '行政法', importance: 3 },
+                { term: '国家賠償法2条', reading: 'こっかばいしょうほうにじょう', description: '公の営造物の設置又は管理の瑕疵による損害に対する国等の賠償責任（無過失責任）', category: '行政法', importance: 3 },
+                { term: '損失補償', reading: 'そんしつほしょう', description: '適法な公権力の行使により加えられた財産上の特別の犠牲に対する補償', category: '行政法', importance: 3 },
+                { term: '情報公開法', reading: 'じょうほうこうかいほう', description: '行政文書の開示請求権を定める法律。不開示情報に該当しない限り開示義務あり', category: '行政法', importance: 2 },
+                { term: '個人情報保護法', reading: 'こじんじょうほうほごほう', description: '個人情報の適正な取扱いに関するルールを定める法律。要配慮個人情報の概念を含む', category: '行政法', importance: 2 },
+                { term: '地方自治法', reading: 'ちほうじちほう', description: '地方公共団体の組織と運営に関する基本法。直接請求制度を含む', category: '行政法', importance: 3 },
+                { term: '直接請求', reading: 'ちょくせつせいきゅう', description: '条例の制定改廃請求（1/50）・事務監査請求（1/50）・議会解散請求（1/3）・解職請求（1/3）', category: '行政法', importance: 3 },
+                { term: '条例', reading: 'じょうれい', description: '地方公共団体が議会の議決により制定する自治立法。法律の範囲内で制定', category: '行政法', importance: 3 },
+                // 民法
+                { term: '権利能力', reading: 'けんりのうりょく', description: '権利義務の主体となりうる資格。出生により取得し死亡により消滅', category: '民法', importance: 3 },
+                { term: '意思能力', reading: 'いしのうりょく', description: '自己の行為の法的結果を認識・判断できる精神的能力。欠く者の法律行為は無効', category: '民法', importance: 3 },
+                { term: '行為能力', reading: 'こういのうりょく', description: '単独で有効な法律行為をすることができる資格。制限行為能力者制度で保護', category: '民法', importance: 3 },
+                { term: '制限行為能力者', reading: 'せいげんこういのうりょくしゃ', description: '未成年者・成年被後見人・被保佐人・被補助人の4類型', category: '民法', importance: 3 },
+                { term: '代理', reading: 'だいり', description: '他人が本人のためにすることを示して意思表示をし、その効果が本人に帰属する制度', category: '民法', importance: 3 },
+                { term: '無権代理', reading: 'むけんだいり', description: '代理権なくしてされた代理行為。本人が追認しない限り本人に効力を生じない', category: '民法', importance: 3 },
+                { term: '表見代理', reading: 'ひょうけんだいり', description: '無権代理だが相手方の信頼を保護して有権代理と同様の効果を認める制度', category: '民法', importance: 3 },
+                { term: '時効', reading: 'じこう', description: '一定期間の経過により権利の取得（取得時効）又は消滅（消滅時効）を生じさせる制度', category: '民法', importance: 3 },
+                { term: '消滅時効', reading: 'しょうめつじこう', description: '権利を行使できることを知った時から5年、行使できる時から10年で権利消滅', category: '民法', importance: 3 },
+                { term: '物権', reading: 'ぶっけん', description: '物を直接に支配し利益を享受する排他的な権利。物権法定主義', category: '民法', importance: 3 },
+                { term: '対抗要件', reading: 'たいこうようけん', description: '物権変動を第三者に対抗するための要件。不動産は登記、動産は引渡し', category: '民法', importance: 3 },
+                { term: '即時取得', reading: 'そくじしゅとく', description: '動産の占有を取得した善意無過失の者が所有権等を取得する制度（192条）', category: '民法', importance: 3 },
+                { term: '抵当権', reading: 'ていとうけん', description: '債務者の不動産を担保に取り、弁済がない場合に優先弁済を受ける約定担保物権', category: '民法', importance: 3 },
+                { term: '留置権', reading: 'りゅうちけん', description: '他人の物を占有する者がその物に関する債権の弁済を受けるまで物を留置できる法定担保物権', category: '民法', importance: 2 },
+                { term: '債権', reading: 'さいけん', description: '特定の者に対して一定の行為（給付）を請求する権利', category: '民法', importance: 3 },
+                { term: '債務不履行', reading: 'さいむふりこう', description: '債務者が正当な理由なく債務の本旨に従った履行をしないこと。履行遅滞・履行不能・不完全履行', category: '民法', importance: 3 },
+                { term: '不法行為', reading: 'ふほうこうい', description: '故意又は過失により他人の権利を侵害した者が損害を賠償する責任（709条）', category: '民法', importance: 3 },
+                { term: '使用者責任', reading: 'しようしゃせきにん', description: '被用者が事業の執行について第三者に加えた損害につき使用者が負う責任（715条）', category: '民法', importance: 3 },
+                { term: '契約', reading: 'けいやく', description: '当事者の意思表示の合致により成立する法律行為。13種の典型契約', category: '民法', importance: 3 },
+                { term: '瑕疵担保責任', reading: 'かしたんぽせきにん', description: '契約不適合責任。引き渡された目的物が種類・品質・数量に関して契約の内容に適合しない場合の売主の責任', category: '民法', importance: 3 },
+                { term: '連帯債務', reading: 'れんたいさいむ', description: '数人の債務者が同一内容の給付について各自独立に全部の給付をすべき債務', category: '民法', importance: 2 },
+                { term: '保証', reading: 'ほしょう', description: '主たる債務者が債務を履行しない場合に保証人が代わりに履行する義務を負う制度', category: '民法', importance: 3 },
+                { term: '相続', reading: 'そうぞく', description: '被相続人の死亡により相続人が財産上の権利義務を承継する制度', category: '民法', importance: 3 },
+                { term: '遺留分', reading: 'いりゅうぶん', description: '一定の相続人に保障された相続財産の一定割合。遺留分侵害額請求権で保護', category: '民法', importance: 3 },
+                { term: '遺言', reading: 'いごん', description: '死後の法律関係を定める単独行為。自筆証書・公正証書・秘密証書の3方式', category: '民法', importance: 2 },
+                { term: '錯誤', reading: 'さくご', description: '意思表示の内容に重要な錯誤がある場合に取り消すことができる（95条）', category: '民法', importance: 3 },
+                { term: '詐欺・強迫', reading: 'さぎきょうはく', description: '詐欺による意思表示は取消可能（善意無過失の第三者に対抗不可）。強迫による意思表示も取消可能（第三者にも対抗可）', category: '民法', importance: 3 },
+                { term: '心裡留保', reading: 'しんりりゅうほ', description: '表意者が真意でないことを知りながらする意思表示。原則有効、相手方が悪意又は有過失の場合は無効', category: '民法', importance: 2 },
+                { term: '虚偽表示', reading: 'きょぎひょうじ', description: '相手方と通じてした虚偽の意思表示。無効だが善意の第三者に対抗できない（94条2項）', category: '民法', importance: 3 },
+                { term: '賃貸借', reading: 'ちんたいしゃく', description: '当事者の一方がある物の使用収益を相手方にさせ、相手方がその賃料を支払う契約', category: '民法', importance: 2 },
+                // 商法・会社法
+                { term: '株式会社', reading: 'かぶしきがいしゃ', description: '株式を発行して資金を調達し、株主は出資額を限度として責任を負う会社形態', category: '商法・会社法', importance: 3 },
+                { term: '株主総会', reading: 'かぶぬしそうかい', description: '株式会社の最高意思決定機関。普通決議・特別決議・特殊決議がある', category: '商法・会社法', importance: 3 },
+                { term: '取締役', reading: 'とりしまりやく', description: '株式会社の業務執行を担う機関。取締役会設置会社では3人以上必要', category: '商法・会社法', importance: 3 },
+                { term: '取締役会', reading: 'とりしまりやくかい', description: '3人以上の取締役で構成される合議体。業務執行の決定・取締役の職務執行の監督', category: '商法・会社法', importance: 2 },
+                { term: '監査役', reading: 'かんさやく', description: '取締役の職務執行を監査する機関。会計監査と業務監査', category: '商法・会社法', importance: 2 },
+                { term: '設立', reading: 'せつりつ', description: '会社を法人として成立させる手続。発起設立と募集設立の2方式', category: '商法・会社法', importance: 2 },
+                { term: '合同会社', reading: 'ごうどうがいしゃ', description: '社員全員が有限責任で内部関係は組合的規律に服する会社形態（LLC）', category: '商法・会社法', importance: 2 },
+                { term: '持分会社', reading: 'もちぶんがいしゃ', description: '合名会社・合資会社・合同会社の総称。社員の個性が重視される', category: '商法・会社法', importance: 2 },
+                // 基礎法学
+                { term: '法源', reading: 'ほうげん', description: '法の存在形式。成文法源（憲法・法律・命令・条例）と不文法源（慣習法・判例法・条理）', category: '基礎法学', importance: 2 },
+                { term: '法の解釈', reading: 'ほうのかいしゃく', description: '文理解釈・論理解釈（拡張解釈・縮小解釈・類推解釈・反対解釈）等の方法がある', category: '基礎法学', importance: 2 },
+                { term: '信義誠実の原則', reading: 'しんぎせいじつのげんそく', description: '権利の行使及び義務の履行は信義に従い誠実に行わなければならない（民法1条2項）', category: '基礎法学', importance: 3 },
+                { term: '権利濫用の禁止', reading: 'けんりらんようのきんし', description: '権利の行使が社会的に許容される限界を超える場合は認められない（民法1条3項）', category: '基礎法学', importance: 3 },
+                { term: '法律行為', reading: 'ほうりつこうい', description: '意思表示を要素とする法律要件。契約・単独行為・合同行為に分類', category: '基礎法学', importance: 3 },
+                { term: '公法と私法', reading: 'こうほうとしほう', description: '公法は国家と国民の関係を規律する法、私法は私人間の関係を規律する法', category: '基礎法学', importance: 2 },
+                { term: '特別法優先の原則', reading: 'とくべつほうゆうせんのげんそく', description: '一般法と特別法が矛盾する場合、特別法が優先して適用される原則', category: '基礎法学', importance: 2 },
             ];
 
             sampleTerms.forEach(termData => {
