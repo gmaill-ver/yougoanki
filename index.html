@@ -23,36 +23,30 @@
             color: #6c757d;
         }
         
-        /* ツールチップのスタイル改善 */
+        /* 用語タグ */
         .term-tag {
             display: inline-flex;
             align-items: center;
-            gap: 6px;
-            padding: 8px 14px;
-            background: white;
-            border: 2px solid #e5e7eb;
-            border-radius: 20px;
-            font-size: 14px;
+            gap: 4px;
+            padding: 3px 6px;
+            background: none;
+            border: none;
+            font-size: 12px;
             transition: all 0.2s ease;
             position: relative;
             user-select: none;
             -webkit-user-select: none;
             -webkit-touch-callout: none;
+            cursor: pointer;
         }
-        
-        .term-tag:hover {
-            border-color: #3b82f6;
-            background: #f0f9ff;
+
+        .term-tag.completed span {
+            color: #aaa;
         }
-        
-        .term-tag.completed {
-            background: #f3f4f6;
-            border-color: #d1d5db;
-        }
-        
+
         .term-tag .checkbox {
-            width: 16px;
-            height: 16px;
+            width: 14px;
+            height: 14px;
             flex-shrink: 0;
         }
         
@@ -127,15 +121,15 @@
         .syllabary-nav {
             display: flex;
             flex-wrap: wrap;
-            gap: 4px;
-            padding: 12px;
+            gap: 3px;
+            padding: 6px;
             background: white;
-            border-radius: 8px;
-            margin-bottom: 16px;
+            border-radius: 6px;
+            margin-bottom: 8px;
         }
         .syllabary-btn {
-            padding: 4px 8px;
-            font-size: 14px;
+            padding: 2px 6px;
+            font-size: 11px;
             border: 1px solid #e5e7eb;
             border-radius: 4px;
             background: white;
@@ -152,16 +146,15 @@
             border-color: #3b82f6;
         }
         .syllabary-section {
-            margin-bottom: 20px;
+            margin-bottom: 8px;
         }
         .syllabary-title {
-            font-size: 16px;
-            font-weight: bold;
-            color: #1f2937;
-            padding: 8px 12px;
-            background: linear-gradient(to right, #f3f4f6, transparent);
-            border-left: 3px solid #3b82f6;
-            margin-bottom: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #999;
+            padding: 4px 8px;
+            border-left: 2px solid #3b82f6;
+            margin-bottom: 4px;
         }
         .progress-bar {
             transition: width 0.8s ease;
@@ -173,11 +166,23 @@
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
+        /* モバイルツールチップ */
+        .mobile-tooltip {
+            display: block;
+            background: #1f2937;
+            color: white;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            margin: 2px 0 4px 18px;
+            max-width: 280px;
+            line-height: 1.4;
+        }
         /* スマホ対応 */
         @media (max-width: 640px) {
             .term-tag {
-                padding: 10px 12px;
-                font-size: 15px;
+                padding: 3px 4px;
+                font-size: 12px;
             }
             .mobile-menu-item {
                 padding: 12px 16px;
@@ -220,56 +225,27 @@
         </header>
 
         <!-- メインコンテンツ -->
-        <main class="flex-grow container mx-auto px-4 py-6 max-w-7xl">
+        <main class="flex-grow container mx-auto px-3 py-3 max-w-7xl">
             <!-- 統計情報 -->
-            <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-6 mb-6">
-                <div class="grid grid-cols-3 gap-4 text-center">
-                    <div>
-                        <div class="text-sm text-blue-600 font-medium mb-1">理解済み</div>
-                        <div class="text-2xl font-bold text-blue-900" id="completedCount">0</div>
-                    </div>
-                    <div>
-                        <div class="text-sm text-blue-600 font-medium mb-1">総用語数</div>
-                        <div class="text-2xl font-bold text-blue-900" id="totalCount">0</div>
-                    </div>
-                    <div>
-                        <div class="text-sm text-blue-600 font-medium mb-1">理解率</div>
-                        <div class="text-2xl font-bold text-blue-900" id="progressRate">0%</div>
-                    </div>
+            <div class="mb-4">
+                <div class="flex items-center gap-4 text-xs text-gray-500 mb-2">
+                    <span><span id="completedCount" class="font-bold text-gray-800">0</span> / <span id="totalCount">0</span> 理解済み</span>
+                    <span id="progressRate" class="font-bold text-gray-800">0%</span>
                 </div>
-                <div class="mt-4 bg-gray-200 rounded-full h-3 overflow-hidden">
-                    <div id="progressBar" class="progress-bar bg-gradient-to-r from-green-400 to-green-600 h-full rounded-full" style="width: 0%"></div>
+                <div class="bg-gray-200 rounded-full h-2 overflow-hidden">
+                    <div id="progressBar" class="progress-bar bg-green-500 h-full rounded-full" style="width: 0%"></div>
                 </div>
             </div>
 
-            <!-- 検索・フィルター・ソート -->
-            <div class="bg-white rounded-lg shadow-sm border p-4 mb-6">
-                <div class="flex flex-col gap-4">
-                    <div class="flex flex-col sm:flex-row gap-4">
-                        <input 
-                            type="text" 
-                            id="searchInput" 
-                            placeholder="用語名・解説で検索..." 
-                            class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-                        >
-                        <select 
-                            id="sortSelect" 
-                            class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        >
-                            <option value="syllabary">五十音順</option>
-                            <option value="newest">新着順</option>
-                            <option value="importance">重要度順</option>
-                            <option value="category">カテゴリ順</option>
-                        </select>
-                    </div>
-                    <div class="flex flex-wrap gap-2">
-                        <button id="filterAllBtn" class="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm">すべて</button>
-                        <button id="filterCompletedBtn" class="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg text-sm">理解済み</button>
-                        <button id="filterIncompleteBtn" class="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg text-sm">未理解</button>
-                        <button id="filterImportantBtn" class="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg text-sm">重要度★★★</button>
-                    </div>
-                </div>
+            <!-- フィルター -->
+            <div class="flex flex-wrap gap-2 mb-4">
+                <button id="filterAllBtn" class="px-3 py-1 bg-blue-600 text-white rounded-full text-xs">すべて</button>
+                <button id="filterCompletedBtn" class="px-3 py-1 bg-gray-200 text-gray-600 rounded-full text-xs">理解済み</button>
+                <button id="filterIncompleteBtn" class="px-3 py-1 bg-gray-200 text-gray-600 rounded-full text-xs">未理解</button>
+                <button id="filterImportantBtn" class="px-3 py-1 bg-gray-200 text-gray-600 rounded-full text-xs">★★★</button>
             </div>
+            <input type="hidden" id="searchInput" value="">
+            <select id="sortSelect" class="hidden"><option value="syllabary" selected>五十音順</option></select>
 
             <!-- 五十音ナビゲーション -->
             <div id="syllabaryNav" class="syllabary-nav">
@@ -920,6 +896,33 @@
             updateStats();
         }
 
+        function renderTermTag(term) {
+            return `<div class="term-tag-wrap" data-id="${term.id}">
+                <div class="term-tag ${term.completed ? 'completed' : ''}">
+                    <input type="checkbox" ${term.completed ? 'checked' : ''} onchange="event.stopPropagation();updateTerm('${term.id}', { completed: this.checked })" class="checkbox">
+                    <span>${escapeHtml(term.term)}</span>
+                </div>
+            </div>`;
+        }
+
+        function bindTermTaps() {
+            document.querySelectorAll('.term-tag-wrap').forEach(el => {
+                el.addEventListener('click', (e) => {
+                    if (e.target.tagName === 'INPUT') return;
+                    const id = el.dataset.id;
+                    const existing = el.querySelector('.mobile-tooltip');
+                    if (existing) { existing.remove(); return; }
+                    document.querySelectorAll('.mobile-tooltip').forEach(t => t.remove());
+                    const term = terms.find(t => t.id === id);
+                    if (!term) return;
+                    const tip = document.createElement('div');
+                    tip.className = 'mobile-tooltip';
+                    tip.textContent = term.description;
+                    el.appendChild(tip);
+                });
+            });
+        }
+
         // 用語の表示
         function displayTerms() {
             const container = document.getElementById('termsList');
@@ -934,63 +937,31 @@
             emptyState.classList.add('hidden');
             
             if (currentSort === 'syllabary' && viewMode === 'tag') {
-                // 五十音順でタグ表示の場合はグループ化
                 const groups = {};
                 filteredTerms.forEach(term => {
                     const group = getSyllabaryGroup(term.reading || term.term);
-                    if (!groups[group]) {
-                        groups[group] = [];
-                    }
+                    if (!groups[group]) groups[group] = [];
                     groups[group].push(term);
                 });
 
                 const syllabaryOrder = ['あ', 'か', 'さ', 'た', 'な', 'は', 'ま', 'や', 'ら', 'わ', '英数', 'その他'];
-                
+
                 container.innerHTML = syllabaryOrder.map(group => {
                     if (!groups[group] || groups[group].length === 0) return '';
                     return `
                         <div class="syllabary-section" id="syllabary-${group}">
                             <div class="syllabary-title">${group}行</div>
-                            <div class="flex flex-wrap gap-3 p-4 bg-white rounded-lg border">
-                                ${groups[group].map(term => `
-                                    <div class="tooltip-container">
-                                        <div class="term-tag ${term.completed ? 'completed' : ''} fade-in">
-                                            <input 
-                                                type="checkbox" 
-                                                ${term.completed ? 'checked' : ''}
-                                                onchange="updateTerm('${term.id}', { completed: this.checked })"
-                                                class="checkbox"
-                                            >
-                                            <span>${escapeHtml(term.term)}</span>
-                                        </div>
-                                        <div class="tooltip">
-                                            ${escapeHtml(term.description)}
-                                        </div>
-                                    </div>
-                                `).join('')}
+                            <div class="flex flex-wrap gap-1" style="padding:2px 0">
+                                ${groups[group].map(term => renderTermTag(term)).join('')}
                             </div>
                         </div>
                     `;
                 }).join('');
+                bindTermTaps();
             } else if (viewMode === 'tag') {
-                // タグ形式の表示（グループ化なし）
-                container.className = 'flex flex-wrap gap-3 p-4 bg-white rounded-lg border';
-                container.innerHTML = filteredTerms.map(term => `
-                    <div class="tooltip-container">
-                        <div class="term-tag ${term.completed ? 'completed' : ''} fade-in">
-                            <input 
-                                type="checkbox" 
-                                ${term.completed ? 'checked' : ''}
-                                onchange="updateTerm('${term.id}', { completed: this.checked })"
-                                class="checkbox"
-                            >
-                            <span>${escapeHtml(term.term)}</span>
-                        </div>
-                        <div class="tooltip">
-                            ${escapeHtml(term.description)}
-                        </div>
-                    </div>
-                `).join('');
+                container.className = 'flex flex-wrap gap-1';
+                container.innerHTML = filteredTerms.map(term => renderTermTag(term)).join('');
+                bindTermTaps();
             } else {
                 // カード形式の表示
                 container.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4';
