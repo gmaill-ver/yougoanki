@@ -927,6 +927,14 @@
                     tip.className = 'mobile-tooltip';
                     tip.textContent = term.description;
                     el.appendChild(tip);
+                    const rect = tip.getBoundingClientRect();
+                    if (rect.right > window.innerWidth) {
+                        tip.style.left = 'auto';
+                        tip.style.right = '0';
+                    }
+                    if (rect.left < 0) {
+                        tip.style.left = '0';
+                    }
                 });
             });
         }
