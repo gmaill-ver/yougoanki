@@ -317,12 +317,7 @@
 
         <main class="container mx-auto px-4 py-6 max-w-7xl">
             <div class="bg-white rounded-lg shadow-sm border p-4 mb-4">
-                <input 
-                    type="text" 
-                    id="editSearchInput" 
-                    placeholder="用語を検索..." 
-                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                >
+                <div id="editSyllabaryNav" class="flex flex-wrap gap-1 justify-center"></div>
             </div>
 
             <div id="editTermsList" class="space-y-2">
@@ -1442,9 +1437,6 @@
                 filterAndDisplayTerms();
             });
 
-            document.getElementById('editSearchInput').addEventListener('input', (e) => {
-                displayEditTerms(e.target.value);
-            });
 
             // フィルターボタン
             document.getElementById('filterAllBtn').addEventListener('click', () => {
@@ -1486,41 +1478,44 @@
         function showEditPage() {
             document.getElementById('mainPage').classList.remove('active');
             document.getElementById('editPage').classList.add('active');
+            editSyllabaryFilter = '';
+            generateEditSyllabaryNav();
             displayEditTerms();
         }
 
+        let editSyllabaryFilter = '';
+        function generateEditSyllabaryNav() {
+            const rows = ['全て','あ','か','さ','た','な','は','ま','や','ら','わ','英数'];
+            const nav = document.getElementById('editSyllabaryNav');
+            if(!nav) return;
+            nav.innerHTML = rows.map(r => `<button class="px-2 py-1 rounded text-xs font-medium transition ${editSyllabaryFilter===(r==='全て'?'':r)?'bg-blue-600 text-white':'bg-gray-100 text-gray-700 hover:bg-gray-200'}" data-kana="${r==='全て'?'':r}">${r}</button>`).join('');
+            nav.querySelectorAll('button').forEach(b => b.addEventListener('click', () => { editSyllabaryFilter = b.dataset.kana; generateEditSyllabaryNav(); displayEditTerms(); }));
+        }
+        function getKanaGroup(reading) {
+            if(!reading) return 'その他';
+            const ch = reading.charAt(0);
+            const map = {'あ':'あ','い':'あ','う':'あ','え':'あ','お':'あ','か':'か','き':'か','く':'か','け':'か','こ':'か','が':'か','ぎ':'か','ぐ':'か','げ':'か','ご':'か','さ':'さ','し':'さ','す':'さ','せ':'さ','そ':'さ','ざ':'さ','じ':'さ','ず':'さ','ぜ':'さ','ぞ':'さ','た':'た','ち':'た','つ':'た','て':'た','と':'た','だ':'た','ぢ':'た','づ':'た','で':'た','ど':'た','な':'な','に':'な','ぬ':'な','ね':'な','の':'な','は':'は','ひ':'は','ふ':'は','へ':'は','ほ':'は','ば':'は','び':'は','ぶ':'は','べ':'は','ぼ':'は','ぱ':'は','ぴ':'は','ぷ':'は','ぺ':'は','ぽ':'は','ま':'ま','み':'ま','む':'ま','め':'ま','も':'ま','や':'や','ゆ':'や','よ':'や','ら':'ら','り':'ら','る':'ら','れ':'ら','ろ':'ら','わ':'わ','を':'わ','ん':'わ'};
+            if(map[ch]) return map[ch];
+            if(/[a-zA-Z0-9０-９]/.test(ch)) return '英数';
+            return 'その他';
+        }
         // 編集ページの表示
-        function displayEditTerms(searchTerm = '') {
+        function displayEditTerms() {
             const container = document.getElementById('editTermsList');
             let displayTerms = [...terms];
-            
-            if (searchTerm) {
-                displayTerms = displayTerms.filter(t => 
-                    t.term.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                    t.description.toLowerCase().includes(searchTerm.toLowerCase())
-                );
+            displayTerms.sort((a,b) => (a.reading||a.term).localeCompare(b.reading||b.term, 'ja'));
+            if (editSyllabaryFilter) {
+                displayTerms = displayTerms.filter(t => getKanaGroup(t.reading || t.term) === editSyllabaryFilter);
             }
 
             container.innerHTML = displayTerms.map(term => `
-                <div class="bg-white border rounded-lg p-4 mobile-menu-item">
-                    <div class="flex-1">
-                        <h3 class="font-semibold text-gray-900">${escapeHtml(term.term)}</h3>
-                        <p class="text-sm text-gray-600">${escapeHtml(term.description)}</p>
-                        <div class="flex gap-2 mt-2">
-                            <button 
-                                onclick="openModal('${term.id}')"
-                                class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm"
-                            >
-                                編集
-                            </button>
-                            <button 
-                                onclick="deleteTerm('${term.id}')"
-                                class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm"
-                            >
-                                削除
-                            </button>
-                        </div>
+                <div class="bg-white border rounded-lg p-3 flex items-center gap-3">
+                    <div class="flex-1 min-w-0">
+                        <h3 class="font-semibold text-gray-900 text-sm">${escapeHtml(term.term)}</h3>
+                        <p class="text-xs text-gray-500 truncate">${escapeHtml(term.description)}</p>
                     </div>
+                    <button onclick="openModal('${term.id}')" class="text-gray-400 hover:text-blue-600 text-lg flex-shrink-0" title="編集">&#x270f;&#xfe0f;</button>
+                    <button onclick="deleteTerm('${term.id}')" class="text-gray-400 hover:text-red-600 text-lg flex-shrink-0" title="削除">&#x1f5d1;&#xfe0f;</button>
                 </div>
             `).join('');
         }
@@ -1604,12 +1599,8 @@
             if (index !== -1) {
                 terms[index] = { ...terms[index], ...updates };
                 localStorage.setItem('memorizeTerms', JSON.stringify(terms));
-                
                 filterAndDisplayTerms();
-                const editSearchInput = document.getElementById('editSearchInput');
-                if (editSearchInput) {
-                    displayEditTerms(editSearchInput.value);
-                }
+                if(document.getElementById('editPage').classList.contains('active')) displayEditTerms();
             }
         }
 
@@ -1618,12 +1609,8 @@
             if (confirm('この用語を削除しますか？')) {
                 terms = terms.filter(t => t.id !== termId);
                 localStorage.setItem('memorizeTerms', JSON.stringify(terms));
-                
                 filterAndDisplayTerms();
-                const editSearchInput = document.getElementById('editSearchInput');
-                if (editSearchInput) {
-                    displayEditTerms(editSearchInput.value);
-                }
+                if(document.getElementById('editPage').classList.contains('active')) displayEditTerms();
             }
         }
 
