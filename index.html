@@ -124,6 +124,9 @@
         .page-container.active {
             display: block;
         }
+        #mainPage.active {
+            display: flex;
+        }
         .syllabary-nav {
             display: flex;
             flex-wrap: wrap;
@@ -216,7 +219,7 @@
 </head>
 <body class="bg-gray-50 min-h-screen flex flex-col">
     <!-- メインページ -->
-    <div id="mainPage" class="page-container active flex flex-col min-h-screen">
+    <div id="mainPage" class="page-container active" style="flex-direction:column;min-height:100vh">
         <!-- ヘッダー -->
         <header class="bg-white shadow-sm border-b">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -479,7 +482,11 @@
         function loadSampleData() {
             const storageKey = 'memorizeSampleLoaded_gyoseishoshi_v3';
             if (localStorage.getItem(storageKey)) return;
-            localStorage.removeItem('memorizeTerms');
+            // 既存のcompletedデータを保持
+            const existingCompleted = {};
+            terms.forEach(t => { if(t.completed) existingCompleted[t.term] = true; });
+            const existingBookmarked = {};
+            terms.forEach(t => { if(t.bookmarked) existingBookmarked[t.term] = true; });
             terms = [];
 
             const sampleTerms = [
@@ -1347,8 +1354,8 @@
 
             sampleTerms.forEach(termData => {
                 termData.id = generateId();
-                termData.completed = false;
-                termData.bookmarked = false;
+                termData.completed = !!existingCompleted[termData.term];
+                termData.bookmarked = !!existingBookmarked[termData.term];
                 termData.createdAt = new Date().toISOString();
                 saveTerm(termData);
             });
